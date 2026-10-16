@@ -3,8 +3,9 @@ import fnmatch
 import subprocess
 from pathlib import Path
 
-from .. import config, gitx
-from ..journal import FINAL, add_event, all_modules, by_default, check_code, ensure_module, task_cards, task_states
+from .. import config, copies, gitx
+from ..journal import (FINAL, add_event, all_modules, by_default, check_area, check_code, ensure_module, guard_main,
+                       is_work_branch, module_base, module_meta, task_cards, task_states)
 from ..util import DpError, pretty, subgroup
 
 
@@ -26,20 +27,36 @@ def cmd_module_new(a):
         raise DpError(f"ветка {br} уже есть")
     if copy.exists():
         raise DpError(f"{copy} уже существует")
-    base = a.from_ or config.main_branch()
+    base = a.from_ or gitx.git("branch", "--show-current", cwd=gitx.toplevel())
+    if not base:
+        raise DpError("текущая копия не на ветке — указать базу модуля --from <ветка>")
+    if is_work_branch(base):
+        raise DpError(f"{base} — ветка модуля или задачи dpcli; модуль заводится от фичеветки задачи: --from <ветка>")
     if not gitx.branch_exists(base):
         raise DpError(f"базовой ветки {base} нет")
     if a.code:
         check_code(a.code, mod)  # до git worktree add: неверный код не оставляет ветку и копию
-    r = gitx.gitr("worktree", "add", "-b", br, str(copy), base)
-    if r.returncode:
-        raise DpError(f"git worktree add: {gitx.gerr(r)}")
-    gitx.reset_worktrees()
-    home = copy / config.plan_dir() / mod
-    ensure_module(mod, home, copy=pretty(copy), code=a.code)
-    add_event(home, None, "note", by_default(a), note=f"модуль заведён от {base}")
-    h = gitx.commit_paths(copy, [home], f"{mod}: заведён модуль dpcli (module.json, events.jsonl)")
+    check_area(a.area)
+    copies.create(copy, br, base)
+    try:
+        home = copy / config.plan_dir() / mod
+        ensure_module(mod, home, copy=pretty(copy), code=a.code, area=a.area, base=base)
+        add_event(home, None, "note", by_default(a), note=f"модуль заведён от {base}")
+        h = gitx.commit_paths(copy, [home], f"{mod}: заведён модуль dpcli (module.json, events.jsonl)")
+    except BaseException:
+        copies.rollback(copy, br)  # не оставлять ветку модуля без копии и журнала
+        raise
     print(f"{mod}: {br} от {base} @ {pretty(copy)}, коммит {h}")
+    for ln in copies.setup(copy):
+        print(f"  {ln}")
+
+
+def cmd_copy_setup(a):
+    path = Path(a.path).expanduser() if a.path else gitx.toplevel()
+    if not (path / ".git").exists():
+        raise DpError(f"{pretty(path)} — не рабочая копия git")
+    for ln in copies.setup(path):
+        print(ln)
 
 
 def cmd_sync(a):
@@ -47,15 +64,32 @@ def cmd_sync(a):
     path = gitx.copy_of(br)
     if not path:
         raise DpError(f"у ветки {br} нет рабочей копии")
-    main = config.main_branch()
+    main = base_of(br)
     h, n, kind = gitx.do_merge(path, main, a.message or f"Слияние {main} в {br}", trailers=a.trailer)
     print(f"{br}: {main} уже влит" if kind == "up-to-date" else f"{br}: влит {main}, {h}, файлов {n}")
 
 
+def base_of(br):
+    """Куда по умолчанию вливается ветка и откуда она подтягивает свежее: ветка задачи → её base из карточки
+    (ветка модуля), ветка модуля → база модуля (фичеветка), иначе — None."""
+    mod = config.module_of_branch(br)
+    mods = all_modules()
+    if mod and mod in mods:
+        return module_base(module_meta(mod, mods[mod]))
+    f = config.task_branch_fields(br)
+    if f and f.get("module") in mods:
+        card = task_cards(mods[f["module"]]).get(f.get("task")) or {}
+        return card.get("base") or config.module_branch(f["module"])
+    return None
+
+
 def cmd_merge(a):
     from .search import sem_index_bg
-    into = a.into or config.main_branch()
     br = resolve_branch(a.branch)
+    into = a.into or base_of(br)
+    if not into:
+        raise DpError(f"{br} — не ветка модуля или задачи dpcli: указать --into <ветка>")
+    guard_main(into, bool(a.into))
     path = gitx.copy_of(into)
     if not path:
         raise DpError(f"ветка {into} нигде не выписана — нужна копия, где она открыта")
@@ -107,11 +141,10 @@ def gc_symlink_reason(path, wt_paths):
     for other in wt_paths:
         if Path(other).resolve() == root:
             continue
-        out = subprocess.run(["git", "-C", str(other), "status", "--porcelain", "--ignored"], capture_output=True, text=True).stdout
-        for l in out.splitlines():
-            if l[:3] not in ("?? ", "!! "):
+        for xy, name in gitx.status_entries(other, "--ignored"):
+            if xy not in ("??", "!!"):
                 continue
-            f = Path(other) / l[3:].rstrip("/")
+            f = Path(other) / name.rstrip("/")
             if f.is_symlink():
                 try:
                     tgt = f.resolve()
@@ -125,15 +158,34 @@ def gc_symlink_reason(path, wt_paths):
 def ignored_dirs(path):
     """Игнорируемые git каталоги копии, кроме кешей сборки gc.ignore_dirs (их тоже снимет удаление копии)."""
     skip = set(config.get("gc.ignore_dirs") or [])
-    out = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--ignored"], capture_output=True, text=True).stdout
-    return [l[3:] for l in out.splitlines() if l.startswith("!! ") and l.endswith("/")
-            and l[3:].rstrip("/").split("/")[0] not in skip and not any(f"{d}/" in l for d in skip)]
+    return [f for xy, f in gitx.status_entries(path, "--ignored") if xy == "!!" and f.endswith("/")
+            and f.rstrip("/").split("/")[0] not in skip and not any(f"{d}/" in f for d in skip)]
 
 
 def junk_ok(f):
-    """Неотслеживаемый файл — сгенерированный (gc.ignore_globs), не работа."""
+    """Неотслеживаемый файл — сгенерированный (gc.ignore_globs, либо внутри каталога из gc.ignore_dirs), не работа."""
     name = f.rstrip("/").rsplit("/", 1)[-1]
+    if set(f.rstrip("/").split("/")) & {str(d) for d in config.get("gc.ignore_dirs") or []}:
+        return True
     return any(fnmatch.fnmatch(name, g) or fnmatch.fnmatch(f, g) for g in config.get("gc.ignore_globs") or [])
+
+
+def remove_copy(path):
+    """Снять копию: отказ (→ причина) при изменениях в отслеживаемых файлах и при неотслеживаемых файлах-работе;
+    игнорируемое git и сгенерированное (gc.ignore_dirs, gc.ignore_globs) копию удалять не мешает. → (причина|None, игнорируемые каталоги)."""
+    d = gitx.dirty(path)
+    if d:
+        return f"грязная копия ({len(d)} файлов)", []
+    junk = [f for xy, f in gitx.status_entries(path) if xy == "??"]
+    other = [f for f in junk if not junk_ok(f)]
+    if other:
+        return f"неотслеживаемые файлы ({len(other)}: {', '.join(other[:3])})", []
+    ign = ignored_dirs(path)
+    # только сгенерированное — не работа: git отказывает на неотслеживаемом, поэтому --force
+    r = gitx.gitr("worktree", "remove", *(["--force"] if junk else []), str(path))
+    if r.returncode:
+        return gitx.gerr(r), []
+    return None, ign
 
 
 def cmd_gc(a):
@@ -169,21 +221,9 @@ def cmd_gc(a):
             continue
         ign = []
         if path:
-            d = gitx.dirty(path)
-            if d:
-                print(f"пропуск {label}: грязная копия ({len(d)} файлов)")
-                continue
-            junk = [l[3:] for l in subprocess.run(["git", "-C", str(path), "status", "--porcelain"], capture_output=True,
-                                                     text=True).stdout.splitlines() if l.startswith("?? ")]
-            other = [f for f in junk if not junk_ok(f)]
-            if other:
-                print(f"пропуск {label}: неотслеживаемые файлы ({len(other)}: {', '.join(other[:3])})")
-                continue
-            # только сгенерированные файлы (gc.ignore_globs) — не работа, снимаем копию с --force
-            ign = ignored_dirs(path)
-            r = gitx.gitr("worktree", "remove", *(["--force"] if junk else []), path)
-            if r.returncode:
-                print(f"пропуск {label}: {gitx.gerr(r)}")
+            why_not, ign = remove_copy(path)
+            if why_not:
+                print(f"пропуск {label}: {why_not}")
                 continue
         r = gitx.gitr("branch", "-d", b)
         print((f"удалено {label}" + (f" (с игнорируемыми: {', '.join(ign[:4])})" if path and ign else ""))
@@ -196,19 +236,28 @@ def cmd_gc(a):
 def register(sp):
     msp = subgroup(sp, "module", "модуль: new (ветка + копия + журнал) | init (только журнал)")
     q = msp.add_parser("new", help="ветка модуля (module_branch) + git worktree (module_copy) + module.json/events.jsonl")
-    q.add_argument("module"); q.add_argument("--from", dest="from_", default=None, help="базовая ветка (по умолчанию main_branch)")
+    q.add_argument("module"); q.add_argument("--from", dest="from_", default=None,
+                                             help="база модуля — фичеветка задачи (по умолчанию текущая ветка главной копии)")
     q.add_argument("--by")
     q.add_argument("--code", help="код модуля для ID задач: 2–4 заглавные латинские (NN, UC), уникален")
+    q.add_argument("--area", help="подпроект модуля (ключ areas в конфиге): чью продуктовую цель закрывает модуль")
     q.set_defaults(func=cmd_module_new)
 
-    q = sp.add_parser("sync", help="влить главную ветку в ветку модуля (в её копии)")
+    csp = subgroup(sp, "copy", "рабочие копии: setup (подготовить копию — хуки, env, node_modules, worktree.setup)")
+    q = csp.add_parser("setup", help="перенести в копию из главной то, чего нет в git (конфиг worktree.*); идемпотентно")
+    q.add_argument("path", nargs="?", help="путь к копии (по умолчанию текущая)")
+    q.set_defaults(func=cmd_copy_setup)
+
+    q = sp.add_parser("sync", help="влить базу модуля (ветку, от которой он заведён) в ветку модуля (в её копии)")
     q.add_argument("target", metavar="модуль|ветка")
     q.add_argument("--message", "-m", help="сообщение слияния вместо стандартного")
     q.add_argument("--trailer", action="append", help="доп. строка в конец сообщения (можно несколько)")
     q.set_defaults(func=cmd_sync)
 
     q = sp.add_parser("merge", help="слияние --no-ff ветки в целевую (в копии, где она выписана)")
-    q.add_argument("branch", metavar="ветка|модуль"); q.add_argument("--into", default=None, help="целевая ветка (main_branch)")
+    q.add_argument("branch", metavar="ветка|модуль")
+    q.add_argument("--into", default=None, help="целевая ветка (по умолчанию: задача → ветка модуля, модуль → его база; "
+                                               "в main_branch — только явно)")
     q.add_argument("--push", action="store_true")
     q.add_argument("--no-index", action="store_true", help="не обновлять смысловой индекс в фоне (при слиянии в главную ветку)")
     q.add_argument("--message", "-m", help="сообщение слияния вместо стандартного")

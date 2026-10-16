@@ -7,6 +7,9 @@
 
 # Основная ветка, куда вливаются модули.
 main_branch: main
+# true — в main_branch dpcli вливает (merge/deliver) только по явному --into и только модуль, заведённый от неё:
+# обычный путь в main — MR фичеветки, который вливает человек.
+protect_main: false
 # Ветка модуля.
 module_branch: "feature/{module}"
 # Ветка задачи (от ветки модуля).
@@ -19,12 +22,33 @@ module_copy: "{copies}/{project}-{module}"
 # Рабочая копия задачи.
 task_copy: "{copies}/{project}-{module}-{task}"
 
+# Подготовка новых рабочих копий (module new, task new; повтор — dpcli copy setup [ПУТЬ]).
+# Копия создаётся с --no-checkout, ключи git-crypt копируются в её GIT_DIR, потом checkout.
+# Источник файлов ниже — главная копия (первая в git worktree list).
+worktree:
+  # Докопировать относительный core.hooksPath (напр. .husky/_) — он игнорируется git и в копии пуст.
+  hooks: true
+  # Игнорируемые git пути главной копии. Шаблон без «/» — по имени на любой глубине, со «/» — от корня.
+  # Что уже есть в копии или чей каталог отсутствует в ветке — пропускается; [] — выключить.
+  # Жёсткими ссылками (cp -al; на другой ФС — копией): дерево своё, файлы общие с главной копией.
+  link: [node_modules]
+  # Обычной копией.
+  copy: [.env, ".env.*"]
+  # Команда bash после подготовки: cwd — новая копия; env DPCLI_COPY, DPCLI_MAIN_COPY, DPCLI_BRANCH.
+  # Ошибка не откатывает копию. Пример: "make prepare"
+  # setup: "..."
+  setup_timeout: 1800
+
 # Журналы и планы модулей: <plan_dir>/<модуль>/ (карточки, отчёты, events.jsonl, decisions.jsonl).
 plan_dir: docs/plan
 # Контракты стыков: <contracts_dir>/<модуль>.md.
 contracts_dir: docs/contracts
 # Каталог документации (INDEX.md, registry/, frontmatter-проверки dpcli docs).
 docs_dir: docs
+# Подпроекты монорепы (module new --area): чью продуктовую цель закрывает модуль; общий код в libs
+# не меняет area. Задан список — module new/deliver без area отказывают (агент спрашивает разработчика),
+# docs check требует area у plan/contract/journal модуля; разделы INDEX.md — в этом порядке. [] — не используется.
+areas: []
 
 # Проверки приёмки (dpcli accept).
 checks:
@@ -43,6 +67,12 @@ checks:
 
 # Куда агенты кладут скриншоты и картинки (подсказка в шаблоне отчёта); по подпапке на задачу.
 artifacts_dir: build/artifacts
+
+# Сдача модуля (dpcli deliver): что из <plan_dir>/<модуль>/ остаётся в итоговой ветке после squash
+# (остальной журнал — только в ветке модуля) и архивный тег на ветку модуля (false — без тега; null — значение по умолчанию).
+deliver:
+  keep: [decisions.md, summary.md]
+  archive_tag: "archive/{module}"
 
 # Зарезервированные коды модулей (не выдаются в module new / task new).
 reserved_codes: []

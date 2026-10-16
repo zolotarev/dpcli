@@ -11,9 +11,11 @@
 Схема frontmatter (YAML, значения — JSON-строки/списки):
   type: guide|plan|contract|research|reference|journal|registry   (ключ конфига docs.types)
   status: active|idea|postponed|closed|superseded                 (docs.statuses)
-  module, updated (ГГГГ-ММ-ДД), summary (вывод/назначение, 1 строка ≤ docs.summary_max), related: []
+  module, area (подпроект из ключа areas; обязателен у plan/contract/journal модуля, если areas задан),
+  updated (ГГГГ-ММ-ДД), summary (вывод/назначение, 1 строка ≤ docs.summary_max), related: []
   research: conclusion, data, applied_in;  contract: contracts: [{id, version}]
   generated: true — файл собирается командой (проверка размера пропускается, руками не править)
+  archive — у journal из deliver: тег/ссылка git с полным журналом модуля
 Размер: > docs.max_kb — ошибка (docs.max_kb_mode: warn — предупреждение); архив и generated не проверяются.
 Область проверки: {docs_dir}/**/*.md + docs.extra (globs от корня), минус docs.exclude (по умолчанию {docs_dir}/archive/**)
 и каталоги модулей dpcli в plan_dir (с module.json).
@@ -25,7 +27,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from .. import config
+from .. import config, yamlmini
 from ..mdsec import headings, match_sections, section_body, toc
 from ..util import CLI, DpError, short
 
@@ -69,6 +71,7 @@ def _cfg():
         "max_kb_mode": str(d.get("max_kb_mode") or "error").strip().lower(),
         "summary_max": int(d.get("summary_max") or DEFAULT_SUMMARY_MAX),
         "registries": lst(d.get("registries"), DEFAULT_REGISTRIES),
+        "areas": lst(c.get("areas"), []),
     }
 
 
@@ -78,9 +81,9 @@ def _root():
 
 
 class Ctx:
-    def __init__(self):
+    def __init__(self, root=None):
         self.c = _cfg()
-        self.root = _root()
+        self.root = Path(root) if root else _root()
         self.docs = self.root / self.c["docs_dir"]
         if self.c["max_kb_mode"] not in ("error", "warn"):
             raise DpError(f"docs.max_kb_mode: '{self.c['max_kb_mode']}' — нужно error или warn")
@@ -104,14 +107,30 @@ class Ctx:
 
 # ---------- frontmatter ----------
 def split_fm(text):
-    """-> (dict|None, тело). Только плоский YAML: key: JSON-значение или голая строка."""
+    """-> (dict|None, тело). YAML через yamlmini (списки блоком и inline); не разобрался — плоский разбор «key: JSON|строка»."""
     if not text.startswith("---\n"):
         return None, text
     end = text.find("\n---", 4)
     if end < 0:
         return None, text
+    fm = _yaml_fm(text[4:end])
+    if fm is None:
+        fm = _flat_fm(text[4:end])
+    rest = text[end + 4:]
+    return fm, rest[1:] if rest.startswith("\n") else rest
+
+
+def _yaml_fm(block):
+    try:
+        fm = yamlmini.loads(block, use_pyyaml=False)  # без PyYAML: даты остаются строками
+    except (yamlmini.YamlError, ValueError):
+        return None
+    return fm if isinstance(fm, dict) else None
+
+
+def _flat_fm(block):
     fm = {}
-    for line in text[4:end].split("\n"):
+    for line in block.split("\n"):
         m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
         if not m:
             continue
@@ -120,11 +139,10 @@ def split_fm(text):
             fm[m.group(1)] = json.loads(v) if v else ""
         except ValueError:
             fm[m.group(1)] = v.strip("'\"")
-    rest = text[end + 4:]
-    return fm, rest[1:] if rest.startswith("\n") else rest
+    return fm
 
 
-ORDER = ["type", "status", "module", "updated", "summary", "related", "conclusion", "data", "applied_in", "contracts", "generated"]
+ORDER = ["type", "status", "module", "area", "updated", "summary", "related", "conclusion", "data", "applied_in", "contracts", "archive", "generated"]
 
 
 def dump_fm(fm):
@@ -201,11 +219,34 @@ def contract_ids(body):
 SUMMARY_HINT = "заполнить summary: вывод/назначение в одну строку"
 
 
+def explicit_paths(x, args, in_scope):
+    """Пути из командной строки (от текущего каталога или от корня) → пути от корня: файл как есть, каталог — файлы области под ним."""
+    out = []
+    for arg in args:
+        p = Path(arg)
+        cands = [p.resolve()] if p.is_absolute() else [(Path.cwd() / p).resolve(), (x.root / p).resolve()]
+        found = next((c for c in cands if c.exists()), None)
+        if found is None:
+            raise DpError(f"docs check: нет такого пути {arg}")
+        try:
+            r = found.relative_to(x.root.resolve()).as_posix()
+        except ValueError:
+            raise DpError(f"docs check: {arg} вне репозитория")
+        got = [r] if found.is_file() else [f for f in in_scope if f.startswith(r.rstrip("/") + "/")] if r != "." else list(in_scope)
+        if found.is_file() and not r.endswith(".md"):
+            raise DpError(f"docs check: {arg} — не .md")
+        out += [g for g in got if g not in out]
+    return out
+
+
 def cmd_check(x, a):
     x.need_docs()
     types, statuses, max_kb = x.c["types"], x.c["statuses"], x.c["max_kb"]
     err, warn = [], []
     items = docs_all(x)
+    only = getattr(a, "paths", None)
+    if only:
+        items = [(r, *split_fm(read(x.root / r))) for r in explicit_paths(x, only, [i[0] for i in items])]
     for r, fm, body in items:
         if fm is None:
             err.append(f"{r}: нет frontmatter")
@@ -230,6 +271,11 @@ def cmd_check(x, a):
             err.append(f"{r}: summary {len(summ)} симв. > {x.c['summary_max']} — сократить до вывода/назначения в одну строку")
         if not fm.get("updated"):
             warn.append(f"{r}: нет updated")
+        areas, area = x.c["areas"], fm.get("area")
+        if areas and area and area not in areas:
+            err.append(f"{r}: area '{area}' не из {areas}")
+        elif areas and not area and fm.get("module") and t in ("plan", "contract", "journal"):
+            err.append(f"{r}: нет area у документа модуля (одно из {areas})")
         if not isinstance(fm.get("related", []), list):
             err.append(f"{r}: related — не список")
         if t == "research":
@@ -373,6 +419,8 @@ def cmd_find(x, a):
             continue
         if a.type and fm.get("type") != a.type or a.status and fm.get("status") != a.status or a.module and fm.get("module") != a.module:
             continue
+        if a.area and fm.get("area") != a.area:
+            continue
         hay = " ".join([r, str(fm.get("summary", "")), str(fm.get("conclusion", "")), str(fm.get("module", ""))]).lower()
         if q and not all(w in hay for w in q.split()):
             continue
@@ -458,8 +506,10 @@ TYPE_TITLES = {"guide": "Описания систем", "plan": "Планы", "
                "reference": "Справка", "journal": "Журналы", "registry": "Реестры"}
 
 
-def write_gen(x, path, title, summary, body, head=GEN_HEAD):
-    fm = {"type": "registry", "status": "active", "module": "", "updated": datetime.date.today().isoformat(),
+def write_gen(x, path, title, summary, body, head=GEN_HEAD, updated=None):
+    """updated — самая поздняя дата исходных документов, не «сегодня»: две ветки с одинаковыми документами
+    собирают один и тот же файл, и слияние не конфликтует на пустом месте."""
+    fm = {"type": "registry", "status": "active", "module": "", "updated": updated or datetime.date.today().isoformat(),
           "summary": summary, "related": [], "generated": True}
     (x.root / path).parent.mkdir(parents=True, exist_ok=True)
     (x.root / path).write_text(dump_fm(fm) + f"\n# {title}\n\n" + head + body, encoding="utf-8")
@@ -478,6 +528,44 @@ def index_line(x, r, fm):
     return f"- [{r}]({_link(x.index_path, r)}) — {summ}{mark}"
 
 
+def module_groups(x, items):
+    """Модули по планам {plan_dir}/<м>.md: {модуль: {plan, docs: [(r, fm)], area}}; документ модуля — module во frontmatter
+    или путь {plan_dir}/<м>/…; area — из плана, иначе из любого документа модуля."""
+    plan = x.c["plan_dir"]
+    mods = {}
+    for r, fm, _ in items:
+        if r.startswith(plan + "/") and r.count("/") == plan.count("/") + 1 and fm.get("type") == "plan":
+            mods[Path(r).stem] = {"plan": (r, fm), "docs": []}
+    for r, fm, _ in items:
+        m = fm.get("module")
+        if m not in mods and r.startswith(plan + "/"):
+            m = r[len(plan) + 1:].split("/")[0]
+        if m in mods and r != mods[m]["plan"][0]:
+            mods[m]["docs"].append((r, fm))
+    for m, g in mods.items():
+        g["area"] = g["plan"][1].get("area") or next((fm.get("area") for _, fm in g["docs"] if fm.get("area")), None)
+    return mods
+
+
+def module_line(x, mod, g):
+    """Строка модуля: summary плана, статус и дата; ссылки на план, контракты, решения, сводку; тег архива журнала."""
+    r, fm = g["plan"]
+    plan, contracts = x.c["plan_dir"], x.c["contracts_dir"]
+    named = {f"{plan}/{mod}/decisions.md": "решения", f"{plan}/{mod}/summary.md": "сводка", f"{contracts}/{mod}.md": "контракты"}
+    links = [f"[план]({_link(x.index_path, r)})"]
+    rest, archive = [], None
+    for k in ("контракты", "решения", "сводка"):
+        links += [f"[{k}]({_link(x.index_path, d)})" for d, _ in g["docs"] if named.get(d) == k]
+    for d, dfm in g["docs"]:
+        archive = archive or dfm.get("archive")
+        if d not in named:
+            rest.append(index_line(x, d, dfm))
+    st = " ".join(x_ for x_ in (fm.get("status") or "", str(fm.get("updated") or "")) if x_)
+    summ = " ".join(str(fm.get("summary", "")).split())
+    line = f"- **{mod}** — {summ} [{st}] — " + " · ".join(links) + (f" · полный журнал: `{archive}`" if archive else "")
+    return [line] + [f"  {l}" for l in rest]
+
+
 def cmd_index(x, a):
     x.need_docs()
     dd = x.c["docs_dir"]
@@ -489,19 +577,39 @@ def cmd_index(x, a):
         fp.write_text(dump_fm(fm) + "\n# Реестр выводов\n\nПо модулю — раздел `## <модуль>`, вывод — пункт `- …` "
                       "(одна строка: вывод с числами и ссылка `путь#раздел`). Поиск — `docs findings`.\n", encoding="utf-8")
     regs = [k for k in x.c["registries"] if k in KNOWN_REGISTRIES]
-    items = [(r, fm, body) for r, fm, body in docs_all(x) if fm is not None and r != x.index_path]
+    items = [(r, fm, body) for r, fm, body in docs_all(x) if fm is not None and r not in generated_paths(x)]
+    upd = max((str(fm.get("updated") or "") for _, fm, _ in items), default="") or None
+
+    out = []
+    mods = module_groups(x, items)
+    in_mod = {r for g in mods.values() for r in [g["plan"][0]] + [d for d, _ in g["docs"]]}
+    found = {g["area"] for g in mods.values()}
+    order = [ar for ar in x.c["areas"] if ar in found] + sorted(ar for ar in found if ar and ar not in x.c["areas"])
+    order += [None] if None in found else []
+    if mods:
+        out.append("Модули — по подпроектам (area), внутри — по дате плана: строка на модуль, под ней — его прочие документы.\n")
+    for ar in order:
+        rows = sorted(((m, g) for m, g in mods.items() if g["area"] == ar), key=lambda mg: (str(mg[1]["plan"][1].get("updated") or ""), mg[0]))
+        out.append(f"## {ar or 'Модули без area'}\n")
+        for m, g in rows:
+            out += module_line(x, m, g)
+        out.append("")
 
     types = list(x.c["types"])
     groups = {}
     for r, fm, _ in items:
+        if r in in_mod:
+            continue
         t = fm.get("type")
         groups.setdefault(t if t in types else None, []).append((r, fm))
-    out = []
+    if groups and mods:
+        out.append("## Прочие документы\n")
+    lvl = "###" if mods else "##"
     for t in types + [None]:
         rows = groups.get(t)
         if not rows:
             continue
-        out.append(f"## {TYPE_TITLES.get(t, t) + f' ({t})' if t in TYPE_TITLES else (t or 'Прочее')}\n")
+        out.append(f"{lvl} {TYPE_TITLES.get(t, t) + f' ({t})' if t in TYPE_TITLES else (t or 'Прочее')}\n")
         out += [index_line(x, r, fm) for r, fm in rows]
         out.append("")
     arch = x.root / x.archive
@@ -513,8 +621,8 @@ def cmd_index(x, a):
             f"- найти — `{CLI} docs find <слова>` (путь — summary), выводы — `{CLI} docs findings <слова>` "
             f"([реестр выводов]({findings})), журналы модулей — `{CLI} search`;\n"
             f"- читать — `{CLI} docs section <путь>` (оглавление), затем `{CLI} docs section <путь> <номер|заголовок>`.\n\n")
-    write_gen(x, x.index_path, "Индекс документации", f"Точка входа: документы {dd}/ по типам, строка на документ.",
-              "\n".join(out), head)
+    write_gen(x, x.index_path, "Индекс документации", f"Точка входа: модули {dd}/ по подпроектам, прочие документы по типам.",
+              "\n".join(out), head, upd)
     made = ["INDEX.md"]
 
     if "research" in regs:
@@ -526,7 +634,7 @@ def cmd_index(x, a):
             extra = "; ".join(f"{k}: {short(fm[k], 80)}" for k in ("data", "applied_in") if str(fm.get(k, "")).strip())
             rows.append(f"- [{r}]({_link(x.reg + '/research.md', r)}) — {short(concl, 200)}" + (f" ({extra})" if extra else ""))
         write_gen(x, f"{x.reg}/research.md", "Реестр исследований", "Исследования: вывод, данные, где применено.",
-                  "\n".join(rows) + "\n")
+                  "\n".join(rows) + "\n", updated=upd)
         made.append("research")
 
     if "contracts" in regs:
@@ -536,7 +644,7 @@ def cmd_index(x, a):
                 cs = ", ".join(f"{k['id']} v{k['version']}" for k in fm.get("contracts", []) if isinstance(k, dict))
                 rows.append(f"- {fm.get('module') or '-'}: {cs or '—'} — [{r}]({_link(x.reg + '/contracts.md', r)})")
         write_gen(x, f"{x.reg}/contracts.md", "Реестр контрактов", "Контракты стыков по модулям: id и версии из заголовков.",
-                  "\n".join(rows) + "\n")
+                  "\n".join(rows) + "\n", updated=upd)
         made.append("contracts")
 
     total = 0
@@ -559,10 +667,33 @@ def cmd_index(x, a):
                 drows.append(f"- {str(k.get('t', ''))[:10]} {k.get('kind', 'decision')}: {txt[:400]}" + (f" — почему: {why[:240]}" if why else ""))
                 total += 1
             drows.append("")
-        write_gen(x, f"{x.reg}/decisions.md", "Реестр решений", f"Решения модулей из decisions.jsonl ({total} записей).", "\n".join(drows))
+        write_gen(x, f"{x.reg}/decisions.md", "Реестр решений", f"Решения модулей из decisions.jsonl ({total} записей).", "\n".join(drows),
+                  updated=upd)
         made.append(f"decisions ({total})")
     print(f"docs index: {', '.join(made)}")
     return 0
+
+
+def generated_paths(x):
+    """Файлы, которые собирает docs index (от корня)."""
+    return {x.index_path} | {f"{x.reg}/{k}.md" for k in KNOWN_REGISTRIES}
+
+
+def resolve_generated(root, files):
+    """Конфликт слияния только в файлах docs index → пересобрать их, git add; → True. Иначе ничего не трогать → False.
+    Индекс — функция документов: при параллельных ветках (координаторы в одной фичеветке, фичеветки в main)
+    он конфликтует всегда, а правильное разрешение одно — собрать заново из слитых документов."""
+    files = [f for f in files if f]
+    x = Ctx(root)
+    if not files or not set(files) <= generated_paths(x) or not x.docs.is_dir():
+        return False
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        cmd_index(x, None)
+    gen = sorted(set(files) | {g for g in generated_paths(x) if (x.root / g).exists()})
+    r = subprocess.run(["git", "add", "--", *gen], cwd=root, capture_output=True, text=True)
+    return r.returncode == 0
 
 
 # ---------- регистрация ----------
@@ -575,13 +706,16 @@ def _run(fn):
 def register(sp):
     p = sp.add_parser("docs", help="реестр и проверка документации: check|index|find|show|section|findings|init")
     ds = p.add_subparsers(dest="docs_cmd", required=True)
-    ds.add_parser("check", help="frontmatter, summary, ссылки, размер").set_defaults(func=_run(cmd_check))
+    q = ds.add_parser("check", help="frontmatter, summary, ссылки, размер (можно только указанные файлы/каталоги)")
+    q.add_argument("paths", nargs="*", metavar="путь", help="проверить только эти файлы (каталог — все документы под ним)")
+    q.set_defaults(func=_run(cmd_check))
     ds.add_parser("index", help="собрать INDEX.md и реестры (docs.registries)").set_defaults(func=_run(cmd_index))
     q = ds.add_parser("find", help="найти документы: строка «путь — summary»")
     q.add_argument("text", nargs="?")
     q.add_argument("--type")
     q.add_argument("--status", help="closed/superseded ищутся и в архиве")
     q.add_argument("--module")
+    q.add_argument("--area")
     q.add_argument("--archive", action="store_true", help="искать и в архиве")
     q.add_argument("--long", action="store_true", help="путь — type — status — summary")
     q.set_defaults(func=_run(cmd_find))

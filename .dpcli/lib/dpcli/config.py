@@ -17,6 +17,8 @@ NAMES = ("dpcli.json", "dpcli.yml", "dpcli.yaml")
 DEFAULTS = {
     "project": None,  # по умолчанию — имя каталога главной рабочей копии
     "main_branch": "main",
+    # true — в main_branch dpcli вливает только по явному --into и только модуль, заведённый от неё (обычный путь — MR)
+    "protect_main": False,
     "module_branch": "feature/{module}",
     "task_branch": "{module}/{task}",
     "copies_dir": "~",
@@ -24,6 +26,8 @@ DEFAULTS = {
     "task_copy": "{copies}/{project}-{module}-{task}",
     "plan_dir": "docs/plan",
     "contracts_dir": "docs/contracts",
+    # подпроекты монорепы, к которым относится модуль (module new --area); пусто — area не используется
+    "areas": [],
     "docs_dir": "docs",
     "checks": {
         "env": {},  # доп. переменные окружения проверок; {tmpdir} — свежий временный каталог
@@ -45,10 +49,21 @@ DEFAULTS = {
     },
     "jobs": {"dir": "~/.cache/dpcli/{project}/jobs", "tmux_session": "dp", "cpu_slots": None},
     "locks": None,  # каталог замков lock cpu|gpu; по умолчанию <jobs.dir>/locks
+    # сдача модуля (deliver): что из <plan_dir>/<модуль>/ попадает в итоговую ветку; журнал — под архивным тегом
+    "deliver": {"keep": ["decisions.md", "summary.md"], "archive_tag": "archive/{module}"},
     "agents_dir": ".dpcli/agents",
     # свои агенты проекта (.claude/agents) в процессе dpcli без правки их файлов: {имя: {role, review}}
     "roles": {},
     "workflow": ".claude/dpcli-workflow.md",
+    # подготовка новых рабочих копий (module new, task new, copy setup) — см. copies.py
+    "worktree": {
+        "hooks": True,  # докопировать относительный core.hooksPath (напр. .husky/_) из главной копии
+        # игнорируемые git пути главной копии: шаблон без «/» — по имени на любой глубине, со «/» — от корня
+        "link": ["node_modules"],  # жёсткими ссылками (cp -al), на другой ФС — копией
+        "copy": [".env", ".env.*"],  # обычной копией
+        "setup": None,  # команда bash в новой копии; env DPCLI_COPY, DPCLI_MAIN_COPY, DPCLI_BRANCH
+        "setup_timeout": 1800,
+    },
 }
 
 _CFG = None
@@ -207,6 +222,12 @@ def contracts_dir():
 
 def docs_dir():
     return str(get("docs_dir")).rstrip("/")
+
+
+def areas():
+    """Допустимые area модулей из конфига (порядок — порядок разделов INDEX.md); [] — area не используется."""
+    v = get("areas") or []
+    return [v] if isinstance(v, str) else [str(x) for x in v]
 
 
 def branch_fields(tpl, br):

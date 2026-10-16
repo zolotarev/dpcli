@@ -4,8 +4,8 @@ import re
 import sys
 from pathlib import Path
 
-from .. import agents, config, gitx
-from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_code, ensure_module, expect_arg,
+from .. import agents, config, copies, gitx
+from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg,
                        find_task, module_home, module_meta, reserved_codes, task_cards)
 from ..util import CLI, DpError, Parser, hm, now, pretty, read_json, read_jsonl, rel, short, subgroup, write_json
 
@@ -57,7 +57,7 @@ def cmd_task_new(a):
     card["base"] = card["base"] or meta["branch"]
     for c in a.contract or []:
         name, _, ver = c.partition("@")
-        card["contracts"].append({"name": name, "version": ver or "?", "ref": meta["contracts"]})
+        card["contracts"].append({"name": name, "version": ver or "?", "ref": contract_ref(name, meta)})
     card["scope"] += a.scope or []
     card["dont_touch"] += a.dont_touch or []
     for f in a.test or []:
@@ -100,7 +100,7 @@ def validate_checks(checks):
 
 
 def make_copy(card):
-    """Рабочая копия и ветка задачи: git worktree add -b <branch> <copy> <base>; есть — переиспользовать."""
+    """Рабочая копия и ветка задачи (copies.create + setup); есть — переиспользовать."""
     br, base = card["branch"], card["base"]
     cp = Path(card["copy"]).expanduser()
     have = gitx.copy_of(br)
@@ -109,15 +109,12 @@ def make_copy(card):
     if cp.exists() and any(cp.iterdir()):
         return f"копия не создана: {pretty(cp)} занят не копией ветки {br} — создайте сами или --copy"
     if gitx.branch_exists(br):
-        r = gitx.gitr("worktree", "add", str(cp), br)
+        copies.create(cp, br)
     elif gitx.branch_exists(base):
-        r = gitx.gitr("worktree", "add", "-b", br, str(cp), base)
+        copies.create(cp, br, base)
     else:
         return f"копия не создана: нет ветки {base} ({CLI} module new {card['module']})"
-    gitx.reset_worktrees()
-    if r.returncode:
-        raise DpError(f"git worktree add {pretty(cp)}: {gitx.gerr(r)}")
-    return f"копия: {pretty(cp)}, ветка {br} от {base}"
+    return "\n  ".join([f"копия: {pretty(cp)}, ветка {br} от {base}"] + copies.setup(cp))
 
 
 def missing_for_brief(card):
@@ -225,7 +222,7 @@ def cmd_task_set(a):
         if old:
             old["version"] = ver or old.get("version", "?")
         else:
-            cs.append({"name": name, "version": ver or "?", "ref": module_meta(mod, home)["contracts"]})
+            cs.append({"name": name, "version": ver or "?", "ref": contract_ref(name, module_meta(mod, home))})
         changed.append(f"contract:{name}")
     acc = card.setdefault("accept", [])
     # сначала снять, потом добавить: --drop-check X --check X … заменяет проверку
@@ -261,6 +258,14 @@ def cmd_task_note(a):
     print(f"{a.id}: дополнение записано → исполнителю: {CLI} inbox {a.id} (и {CLI} task show {a.id})")
 
 
+def contract_ref(name, meta, stored=""):
+    """Файл контракта: «<имя>.Cx» — контракт другого модуля <имя> (docs/contracts/<имя>.md), иначе — контракты текущего."""
+    head = name.split(".", 1)[0] if "." in name else ""
+    if head and head != meta.get("module"):
+        return f"{config.contracts_dir()}/{head}.md"
+    return stored or meta["contracts"]
+
+
 def cmd_task_show(a):
     mod, home = find_task(a.id)
     card = read_json(home / "tasks" / f"{a.id}.json")
@@ -285,7 +290,7 @@ def cmd_task_show(a):
     L.append(f"План: {plan} ({CLI} plan {mod} <раздел>)")
     L.append(f"Копия: {card.get('copy')}  ветка: {card.get('branch')} от {card.get('base')}")
     if card.get("contracts"):
-        L.append("Контракты: " + "; ".join(f"{c['name']} v{c.get('version', '?')} ({c.get('ref', '')})" for c in card["contracts"]))
+        L.append("Контракты: " + "; ".join(f"{c['name']} v{c.get('version', '?')} ({contract_ref(c['name'], meta, c.get('ref', ''))})" for c in card["contracts"]))
     for key, title in (("scope", "Скоуп"), ("dont_touch", "Не трогать")):
         items = card.get(key) or []
         if items and (full or len(items) > 3):
@@ -334,15 +339,18 @@ def cmd_task_sync(a):
 
 def cmd_module_init(a):
     home = module_home(a.module)
-    ensure_module(a.module, home, plan=a.plan, contracts=a.contracts, branch=a.branch, copy=a.copy, code=a.code)
-    if a.legacy or a.code:
-        mp = home / "module.json"
-        m = read_json(mp) or {}
+    ensure_module(a.module, home, plan=a.plan, contracts=a.contracts, branch=a.branch, copy=a.copy, code=a.code, area=a.area)
+    mp = home / "module.json"
+    m = read_json(mp) or {}
+    check_area(a.area or m.get("area"))
+    if a.legacy or a.code or a.area:
         if a.legacy:
             m["legacy_journal"] = a.legacy
         if a.code:
             check_code(a.code, a.module)
             m["code"] = a.code
+        if a.area:
+            m["area"] = a.area
         write_json(mp, m)
     print(f"{a.module}: {rel(home)}")
 
@@ -395,4 +403,5 @@ def register(sp):
     q.add_argument("--plan"); q.add_argument("--contracts"); q.add_argument("--branch"); q.add_argument("--copy")
     q.add_argument("--code", help="код модуля для ID задач: 2–4 заглавные латинские (NN, UC), уникален")
     q.add_argument("--legacy", metavar="ПУТЬ", help="ссылка на старый журнал модуля (поле legacy_journal в module.json)")
+    q.add_argument("--area", help="подпроект модуля (ключ areas в конфиге); у существующего модуля — задать или сменить")
     q.set_defaults(func=cmd_module_init)

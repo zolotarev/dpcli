@@ -86,8 +86,26 @@ def copy_of(branch):
     return None
 
 
+def status_entries(path, *flags, pathspec=()):
+    """[(XY, путь)] из `git status --porcelain -z`: пути без кавычек и escape (пробелы, кириллица); у переименования — новый."""
+    if path and not Path(path).is_dir():
+        return []  # копию уже сняли (gc --remove в том же проходе)
+    args = ["-c", "core.quotepath=off", "status", "--porcelain", "-z", *flags] + (["--", *pathspec] if pathspec else [])
+    parts = gitr(*args, cwd=path).stdout.split("\0")
+    res, i = [], 0
+    while i < len(parts):
+        ent = parts[i]
+        i += 1
+        if len(ent) < 4:
+            continue
+        res.append((ent[:2], ent[3:]))
+        if ent[0] in "RC" or ent[1] in "RC":
+            i += 1  # следом идёт прежнее имя
+    return res
+
+
 def dirty(path):
-    return [l for l in gitr("status", "--porcelain", "--untracked-files=no", cwd=path).stdout.splitlines() if l.strip()]
+    return [f"{xy} {f}" for xy, f in status_entries(path, "--untracked-files=no")]
 
 
 def commit_paths(cwd, paths, msg):
@@ -115,13 +133,18 @@ def do_merge(path, src, msg, ff=True, trailers=None):
             + [x for t in trailers or [] for x in ("-m", t)] + ([] if ff else ["--no-ff"]) + [src])
     r = gitr(*args, cwd=path)
     if r.returncode:
-        files = gitr("diff", "--name-only", "--diff-filter=U", cwd=path).stdout.split()
+        files = gitr("-c", "core.quotepath=off", "diff", "--name-only", "-z", "--diff-filter=U", cwd=path).stdout.split("\0")
+        from .commands.docs import resolve_generated
+        if resolve_generated(path, files) and not gitr("commit", "-q", "--no-edit", cwd=path).returncode:
+            print(f"конфликт только в сгенерированных индексах ({', '.join(f for f in files if f)}) — пересобраны (docs index)")
+            r = None
+    if r is not None and r.returncode:
         gitr("merge", "--abort", cwd=path)
-        raise DpError(f"конфликт при слиянии {src} в {pretty(path)}, отменено (merge --abort); файлы: {', '.join(files) or gerr(r)}")
+        raise DpError(f"конфликт при слиянии {src} в {pretty(path)}, отменено (merge --abort); файлы: {', '.join(f for f in files if f) or gerr(r)}")
     after = gitr("rev-parse", "HEAD", cwd=path).stdout.strip()
     if after == before:
         return after[:7], 0, "up-to-date"
-    nfiles = len(gitr("diff", "--name-only", before, after, cwd=path).stdout.split())
+    nfiles = len([f for f in gitr("diff", "--name-only", "-z", before, after, cwd=path).stdout.split("\0") if f])
     return after[:7], nfiles, "merged"
 
 

@@ -9,7 +9,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from .. import agents, config, gitx, reexec
+from .. import agents, config, copies, gitx, reexec
 from ..journal import add_event, by_default, expect_arg, find_task
 from ..util import CLI, DpError, die, now, read_json, rel, short, write_json
 from .jobs import job_start, tmux_args, tmux_opts
@@ -148,10 +148,21 @@ def run_check(c, cwd, logdir, idx, tid):
     return name, ok, val, str(log), dur
 
 
+_NOTE = re.compile(r"\s+(?:—|–|-|\(|:)(?:\s|$)")
+
+
 def _pat(entry):
-    """Путь/glob из пункта scope: первое слово («src/x.py — функция f» → src/x.py)."""
-    w = str(entry).strip().split()
-    return w[0].strip("`'\"") if w else ""
+    """Шаблоны из пункта scope: путь/glob. Путь может содержать пробелы («docs/Мои заметки/Контракт.md»), а после него —
+    пояснение («src/x.py — функция f»): берём текст в обратных кавычках, иначе всё до « — »/« - »/« (»/«: »;
+    если пояснения нет, годится и вся строка, и её первое слово (прежнее поведение). → список шаблонов."""
+    e = str(entry).strip()
+    q = re.match(r"^`([^`]+)`", e)
+    if q:
+        return [q.group(1).strip()]
+    m = _NOTE.search(e)
+    head = (e[:m.start()] if m else e).strip().strip("'\"")
+    first = e.split()[0].strip("`'\"") if e.split() else ""
+    return [x for x in dict.fromkeys([head, first]) if x]
 
 
 def path_in(path, pats):
@@ -171,19 +182,17 @@ def path_in(path, pats):
 
 def changed_files(cwd, base):
     """Изменённые в ветке относительно base (base...HEAD) + незакоммиченные (вкл. неотслеживаемые)."""
-    r = gitx.gitr("-c", "core.quotepath=off", "diff", "--name-only", f"{base}...HEAD", cwd=cwd)
+    r = gitx.gitr("-c", "core.quotepath=off", "diff", "--name-only", "-z", f"{base}...HEAD", cwd=cwd)
     if r.returncode:
         raise DpError(f"git diff {base}...HEAD: {gitx.gerr(r)}")
-    files = set(r.stdout.split("\n"))
-    st = gitx.gitr("-c", "core.quotepath=off", "status", "--porcelain", "--untracked-files=all", cwd=cwd).stdout
-    for ln in st.splitlines():
-        files.add(ln[3:].split(" -> ")[-1].strip('"'))
+    files = set(r.stdout.split("\0"))
+    files.update(f for _xy, f in gitx.status_entries(cwd, "--untracked-files=all"))
     return sorted(f for f in files if f)
 
 
 def scope_check(card, cwd, mod):
     """(ok | None — пропущено, значение): изменённые файлы ветки задачи ⊂ scope и ∩ dont_touch = ∅."""
-    scope = [_pat(x) for x in card.get("scope") or []]
+    scope = [p for x in card.get("scope") or [] for p in _pat(x)]
     if not any(scope):
         return None, "пропущено: пустой scope"
     br, base = card.get("branch"), card.get("base") or config.module_branch(mod)
@@ -196,10 +205,12 @@ def scope_check(card, cwd, mod):
         return False, str(e)
     skip = [f"{config.plan_dir()}/{mod}/", str(config.get("checks.log_dir") or "build/dpcli")]
     skip += [str(d) for d in config.get("gc.ignore_dirs") or []]
+    hp = copies.hooks_dir(cwd)
+    skip += [hp] if hp else []  # каталог хуков (.husky/_) — подготовка копии, не работа задачи
     globs = [str(g) for g in config.get("gc.ignore_globs") or []]
     files = [f for f in files if not path_in(f, skip) and not any(fnmatch.fnmatch(f.rsplit("/", 1)[-1], g) for g in globs)
              and not any(f"/{d}/" in f"/{f}" for d in config.get("gc.ignore_dirs") or [])]
-    dont = [_pat(x) for x in card.get("dont_touch") or []]
+    dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
     out = [f for f in files if not path_in(f, scope)]
     bad = [f for f in files if path_in(f, dont)]
     if not out and not bad:

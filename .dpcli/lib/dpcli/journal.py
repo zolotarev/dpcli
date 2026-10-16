@@ -16,14 +16,14 @@ ID_RE = re.compile(r"^([A-Z]{2,4})-([A-Z]?)(\d+)[a-z]?$")  # NN-7, NN-7a, эта
 
 
 def infer_role():
-    """Автор без --by и $DPCLI_ROLE — по ветке копии: main_branch → main, ветка модуля → coordinator, иначе executor;
-    вне репозитория → «-»."""
+    """Автор без --by и $DPCLI_ROLE — по ветке копии: ветка модуля → coordinator, ветка задачи → executor,
+    любая другая (main_branch или фичеветка, от которой заводят модули) → main; вне репозитория → «-»."""
     br = gitx.git("branch", "--show-current")
     if not br:
         return "-"
-    if br == config.main_branch():
-        return "main"
-    return "coordinator" if config.module_of_branch(br) else "executor"
+    if config.module_of_branch(br):
+        return "coordinator"
+    return "executor" if config.task_branch_fields(br) else "main"
 
 
 def by_default(args):
@@ -90,6 +90,29 @@ def resolve_target(x):
     return mod, home, x
 
 
+def is_work_branch(br):
+    """Ветка модуля или задачи dpcli — от неё модуль не заводят и в неё не сдают."""
+    return bool(config.module_of_branch(br) or config.task_branch_fields(br))
+
+
+def module_base(meta):
+    """База модуля — ветка, от которой он заведён (module new --from, по умолчанию текущая ветка главной сессии);
+    в неё — sync и deliver. Старые модули без base — main_branch."""
+    return meta.get("base") or config.main_branch()
+
+
+def guard_main(into, explicit, base=None):
+    """protect_main: в main_branch dpcli вливает только по явному --into и только модуль, заведённый от неё:
+    обычный путь в main — MR фичеветки, который вливает человек."""
+    main = config.main_branch()
+    if into != main or not config.get("protect_main"):
+        return
+    if not explicit:
+        raise DpError(f"в {main} без явного --into {main} не вливаю: обычный путь — фичеветка → MR, вливает человек")
+    if base and base != main:
+        raise DpError(f"модуль заведён от {base}: сдаётся в {base}, в {main} — только через MR фичеветки")
+
+
 def module_meta(mod, home):
     m = read_json(home / "module.json") or {}
     m.setdefault("module", mod)
@@ -123,9 +146,25 @@ def check_code(code, mod):
         raise DpError(f"код {code} уже у модуля {other}")
 
 
+def check_area(area, required=True):
+    """area модуля — из config.areas; если список задан, без area модуль не заводится."""
+    allowed = config.areas()
+    if not allowed:
+        return
+    if not area:
+        if required:
+            raise DpError(f"нужен --area: одно из {', '.join(allowed)} (ключ areas в конфиге). "
+                          f"Не выбирать самому — спросить разработчика, к какому подпроекту относится модуль")
+        return
+    if area not in allowed:
+        raise DpError(f"area «{area}» не из {', '.join(allowed)} (ключ areas в конфиге)")
+
+
 def ensure_module(mod, home, **kw):
     if kw.get("code"):
         check_code(kw["code"], mod)
+    if kw.get("area"):
+        check_area(kw["area"])
     p = home / "module.json"
     if not p.exists():
         meta = {"module": mod, "plan": f"{config.plan_dir()}/{mod}.md", "contracts": f"{config.contracts_dir()}/{mod}.md",
@@ -228,10 +267,9 @@ def journal_commit(path):
     pd = config.plan_dir()
     pparts = list(Path(pd).parts)
     n = len(pparts)
-    out = gitx.gitr("status", "--porcelain", "--untracked-files=all", "--", pd, cwd=path).stdout
     mods = []
-    for l in out.splitlines():
-        parts = l[3:].strip().strip('"').split("/")
+    for _xy, f in gitx.status_entries(path, "--untracked-files=all", pathspec=[pd]):
+        parts = f.split("/")
         if len(parts) >= n + 2 and parts[:n] == pparts and parts[n] not in mods:
             mods.append(parts[n])
     for m in mods:
