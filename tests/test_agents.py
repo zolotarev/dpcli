@@ -62,7 +62,7 @@ class Agents(unittest.TestCase):
 
     def test_custom_agent(self):
         (self.p.root / ".dpcli" / "agents" / "dp-custom.md").write_text(NEW_AGENT, encoding="utf-8")
-        mc = self.p.copies / "proj-aa"
+        mc = self.p.copies / "proj" / "aa"
         # агенты читаются от корня текущей копии: кладём и туда
         (mc / ".dpcli" / "agents").mkdir(parents=True, exist_ok=True)
         (mc / ".dpcli" / "agents" / "dp-custom.md").write_text(NEW_AGENT, encoding="utf-8")

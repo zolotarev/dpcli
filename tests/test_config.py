@@ -66,7 +66,7 @@ class InProject(unittest.TestCase):
         card = json.loads(next((p.copies / "m-pr-aa").rglob("AA-1.json")).read_text())
         self.assertEqual(card["branch"], "t/aa-AA-1")
         self.assertEqual(card["base"], "mod/aa")
-        self.assertTrue(card["copy"].endswith("task-copy") or "pr-aa-AA-1" in card["copy"])
+        self.assertTrue(card["copy"].endswith("task-copy") or "pr/aa-AA-1" in card["copy"])
 
     def test_config_from_subdir(self):
         p = Project()

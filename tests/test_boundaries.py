@@ -116,13 +116,13 @@ class BriefAndCopy(unittest.TestCase):
 
     def test_task_new_creates_copy(self):
         out = self.new()
-        tc = self.p.copies / "proj-aa-AA-1"
+        tc = self.p.copies / "proj" / "aa-AA-1"
         self.assertIn("копия", out)
         self.assertEqual(git("rev-parse", "--abbrev-ref", "HEAD", cwd=tc), "aa/AA-1")
         # повтор (--force) — переиспользует копию
         self.assertIn("уже есть", self.p.ok("task", "new", "aa", "AA-1", "--type", "dp-engineer", "--force"))
         self.new("--no-copy")
-        self.assertFalse((self.p.copies / "proj-aa-AA-2").exists())
+        self.assertFalse((self.p.copies / "proj" / "aa-AA-2").exists())
 
 
 class ScopeCheck(unittest.TestCase):
@@ -134,7 +134,7 @@ class ScopeCheck(unittest.TestCase):
     def task(self, *extra):
         out = self.p.ok("task", "new", "aa", "--type", "dp-writer", "--title", "T", "--check", "c", "true", "exit=0", *extra)
         tid = out.split(":")[0]
-        return tid, self.p.copies / f"proj-aa-{tid}"
+        return tid, self.p.copies / "proj" / f"aa-{tid}"
 
     def write(self, tc, path, commit=True):
         f = tc / path

@@ -14,7 +14,7 @@ class Flow(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.p = Project()
-        cls.mc = cls.p.copies / "proj-demo"
+        cls.mc = cls.p.copies / "proj" / "demo"
 
     @classmethod
     def tearDownClass(cls):
@@ -23,7 +23,7 @@ class Flow(unittest.TestCase):
     def mk_task(self, typ, *extra):
         out = self.p.ok("task", "new", "demo", "--type", typ, "--title", f"Задача {typ}", "--goal", "цель", *extra)
         tid = out.split(":")[0]
-        tc = self.p.copies / f"proj-demo-{tid}"  # копию и ветку задачи создаёт task new
+        tc = self.p.copies / "proj" / f"demo-{tid}"  # копию и ветку задачи создаёт task new
         self.assertEqual(git("rev-parse", "--abbrev-ref", "HEAD", cwd=tc), f"demo/{tid}")
         (tc / f"{tid}.txt").write_text("x", encoding="utf-8")
         self.p.commit_all(f"работа {tid}", cwd=tc)
@@ -177,7 +177,7 @@ class AcceptExpect(unittest.TestCase):
         code, _, err = p.run("task", "new", "aa", "--type", "dp-writer", "--check", "x", "true", "garbage")
         self.assertNotEqual(code, 0)
         self.assertIn("garbage", err)
-        self.assertFalse(list((p.copies / "proj-aa" / "docs" / "plan" / "aa" / "tasks").glob("*.json")))
+        self.assertFalse(list((p.copies / "proj" / "aa" / "docs" / "plan" / "aa" / "tasks").glob("*.json")))
         p.ok("task", "new", "aa", "--type", "dp-writer", "--check", "x", "true", "exit=0")
         self.assertNotEqual(p.run("task", "set", "AA-1", "--check", "y", "true", "num:x")[0], 0)
         self.assertNotEqual(p.run("task", "set", "AA-1", "--check", "y", "true", "re:(")[0], 0)

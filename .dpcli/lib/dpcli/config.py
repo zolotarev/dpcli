@@ -21,9 +21,9 @@ DEFAULTS = {
     "protect_main": False,
     "module_branch": "feature/{module}",
     "task_branch": "{module}/{task}",
-    "copies_dir": "~",
-    "module_copy": "{copies}/{project}-{module}",
-    "task_copy": "{copies}/{project}-{module}-{task}",
+    "copies_dir": "~/worktrees",
+    "module_copy": "{copies}/{project}/{module}",
+    "task_copy": "{copies}/{project}/{module}-{task}",
     "plan_dir": "docs/plan",
     "contracts_dir": "docs/contracts",
     # подпроекты монорепы, к которым относится модуль (module new --area); пусто — area не используется
@@ -162,7 +162,7 @@ def project():
 
 
 def copies_dir():
-    return Path(os.path.expanduser(subst(os.environ.get("DPCLI_COPIES") or get("copies_dir", "~"), copies=None)))
+    return Path(os.path.expanduser(subst(os.environ.get("DPCLI_COPIES") or get("copies_dir", "~/worktrees"), copies=None)))
 
 
 def subst(tpl, **kw):
