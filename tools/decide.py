@@ -66,6 +66,7 @@ def main(pr):
     if verdict == "accept":
         state = tests_state(pr)
         if state == "success":
+            gh("pr", "edit", pr, "--remove-label", "rework", check=False)
             gh("pr", "merge", pr, "--squash", "--delete-branch")
             tag = release()
             return print(f"#{pr}: merged" + (f", released {tag}" if tag else ""))
