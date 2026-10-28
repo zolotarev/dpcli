@@ -1,5 +1,8 @@
 # Changelog
 
+## 12
+- Workflow template: removed lines that repeated rules stated elsewhere in it (−99 prompt tokens).
+
 ## 11
 - `update` also commits the re-rendered process description (`workflow`, `.claude/dpcli-workflow.md` by default); it was left uncommitted when a release changed it.
 

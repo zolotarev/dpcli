@@ -33,12 +33,11 @@ Agents send only these formats. Details are in the journal; read them with comma
 
 - User decisions are already in the inbox (via `decide`); don't retell them in messages.
 - Add nothing to `brief`: task specifics go into the card (`{{cli}} task note <ID> "…"`).
-- Don't retell what is in the journal (report, review, status) — give the ID.
 - Missing information — ask in one line, don't read someone else's context.
 - New rules for a running agent — by message, no restart.
 
 ## Task card — boundaries
-Executor quality is set by card clarity. The coordinator writes it so the executor has nothing to search for:
+The coordinator writes it so the executor has nothing to search for:
 - `goal` — 1–2 sentences, what must come out;
 - `scope` — files/dirs that change; `dont_touch` — where there is temptation or risk;
 - `accept` checks: `--test <filter>` or `--check <name> "<cmd>" "<expect>"` — executable, with thresholds;
@@ -76,7 +75,6 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
 - Batches of runs — one script, one background run, results as a table; not a "run → look" loop.
 - Don't open images unless appearance is the subject of the task; verify with numbers. Artifacts — in `artifacts_dir`, a subfolder per task.
-- Read plans and contracts by section: `{{cli}} plan <m> <section>`, `--contracts <name>`.
 - Commits — only your own files: `git add <paths> && git commit -m "…" -- <paths>`, with a `Claude-Session` line; no push. Never `git stash`: the stash is shared by all worktrees.
 - Don't change `.claude/` or CLAUDE.md unless that is the task.
 
@@ -112,17 +110,14 @@ Opus only if the task needs design that cannot be moved into the plan or a contr
 - Project changes live in the project layer `.dpcli-local/` (see its README), never in `.dpcli/` — the distribution is replaced on update: `agents/<name>.append.md` adds to a dpcli agent, `agents/<name>.md` is an own agent, `skills/<name>/`, `workflow.md` (project rules), `claude-md.md`. Then `{{cli}} init`.
 - `init` does not touch files it did not create: same-named files in `.claude/agents/` are skipped.
 - Attach your own agent to a role — `roles` in `dpcli.yml` (`name: {role: executor, review: true}`) or `dpcli_role` in its frontmatter; then it is valid in `task new --type`.
-- Role registry — `{{cli}} agents`.
 
 ## Monitoring
 - The main session does not poll on a timer: it wakes on a coordinator message (gate, `<m> done`, blocked) or on the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`); daily summary — `{{cli}} digest --since today`.
 - Stall: "⚠quiet" > 30–40 min — find out what it is doing, report.
 
 ## Sessions and context
-Every turn pays for the whole session context again: a short answer at 500k context costs like 500k.
-- One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
+Every turn pays for the whole session context again.- One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
 - With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
-- Subagents — only when needed (protocol, waves); their answer is an ID and a line, no retelling.
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
