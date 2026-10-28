@@ -304,9 +304,9 @@ def cmd_task_show(a):
         L.append(f"Notes: {card['notes']}")
     adds = addenda(home, a.id)
     if adds:
-        L.append(f"Addenda since handout ({len(adds)}):")
-        L += [f"  ! {hm(e['t'])} ({e.get('by', '-')}): {e['note'] if full else short(e['note'], 300)}"
-              for e in adds[-(len(adds) if full else 5):]]
+        shown = adds if full else adds[-5:]
+        L.append(f"Addenda since handout ({len(adds)}" + (f", older {len(adds) - len(shown)}: --full" if len(shown) < len(adds) else "") + "):")
+        L += [f"  ! {hm(e['t'])} ({e.get('by', '-')}): {e['note']}" for e in shown]
     nedit = sum(1 for e in read_jsonl(home / "events.jsonl") if e.get("task") == a.id and e.get("ev") == "edited")
     if nedit:
         L.append(f"Card edited {nedit} time(s) ({CLI} task show {a.id} --diff)")
