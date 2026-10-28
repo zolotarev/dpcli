@@ -1,7 +1,7 @@
 {
   "code_lines": 5618,
-  "prompt_tokens": 7085,
-  "prompt_max": 3423,
+  "prompt_tokens": 6982,
+  "prompt_max": 3320,
   "duplicate_windows": 0,
   "risky": {
     "rm -rf": 0,

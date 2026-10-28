@@ -1,5 +1,8 @@
 # Changelog
 
+## 12
+- Process description (`workflow.md`) trimmed by ~100 tokens: repeated and decorative phrases removed, no rule changed.
+
 ## 11
 - `update` also commits the re-rendered process description (`workflow`, `.claude/dpcli-workflow.md` by default); it was left uncommitted when a release changed it.
 
