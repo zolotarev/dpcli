@@ -108,7 +108,11 @@ class Contribute(unittest.TestCase):
 
     def test_no_gh_writes_patch(self):
         self.improve()
-        env = {**self.env, "PATH": "/usr/bin:/bin"}
+        nogh = self.p.tmp / "nogh"
+        nogh.mkdir()
+        (nogh / "gh").write_text("#!/bin/sh\nexit 1\n")  # a gh that is not logged in, whatever the machine has
+        (nogh / "gh").chmod(0o755)
+        env = {**self.env, "PATH": f"{nogh}:{os.environ['PATH']}"}
         out = self.p.ok("contribute", "F-1", env=env)
         self.assertIn("gh", out)
         d = self.p.root / "build" / "dpcli" / "contribute-F-1"
