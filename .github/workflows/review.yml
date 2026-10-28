@@ -1,0 +1,41 @@
+name: review
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number (for PRs opened by workflows)
+        required: true
+concurrency:
+  group: review-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+  checks: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    env:
+      PR: ${{ github.event.pull_request.number || inputs.pr }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # base branch only: the PR's code is never checked out or executed in this privileged job
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: AI review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Repository ${{ github.repository }}, pull request #${{ env.PR }}.
+            Follow .github/prompts/review.md exactly.
+          claude_args: >-
+            --allowedTools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh search issues:*),Bash(gh issue view:*)"
+      - name: merge, rework or reject
+        run: python3 tools/decide.py "$PR"

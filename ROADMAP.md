@@ -23,6 +23,7 @@ flowchart LR
 | 4 | Installer | `curl … install.sh \| bash`: submodule, config (language, worktree setup), `init`, optional modern tools; migrates a vendored copy |
 | 5 | Fast tools | Agents use `rg`, `fd`, `jq`, `ast-grep`, Read with offset; dpcli batches git calls in `status`/`gc` and pre-filters with `rg` |
 | 5b | The hub's CI | `test.yml` (tests, VERSION/CHANGELOG, anonymity, budgets), `review.yml` (AI verdict), `merge.yml` (merge + tag), `nightly.yml` (measure lightness, one shrinking PR) |
+| ✓ | Phases 0a–5b | released in v4–v9 and the hub CI |
 | 6+ | Fixes driven by the ledger | Ordered by frequency of `feedback` issues and their `+1`s |
 
 ## Known frictions to start with

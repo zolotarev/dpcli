@@ -41,7 +41,7 @@ Multi-agent coding falls apart in predictable ways: agents retell each other's c
 | Agents trample each other | One git worktree and branch per task; locks for CPU/GPU-heavy runs |
 | Same frictions every week | Agents log frictions as they work; dpcli clusters them, fixes ship as PRs to this repo, every project gets them on update |
 
-> **Status:** the core (journal, cards, acceptance, worktrees, delivery), the installer, the friction ledger (`feedback`, `stats`, `contribute`) and auto-update are released. The hub CI (automatic review and merge, nightly simplification) is being built — see [ROADMAP.md](ROADMAP.md).
+> **Status:** released — the core (journal, cards, acceptance, worktrees, delivery), the installer, the friction ledger (`feedback`, `stats`, `contribute`), auto-update and the hub CI (tests, budgets, AI review and merge, nightly simplification). See [ROADMAP.md](ROADMAP.md).
 
 ## Quick start
 

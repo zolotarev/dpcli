@@ -1,0 +1,49 @@
+name: nightly
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: write
+jobs:
+  shrink:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git config --global user.name "dpcli nightly" && git config --global user.email "nightly@users.noreply.github.com"
+      - name: measure
+        run: python3 tools/metrics.py > metrics.json && python3 tools/metrics.py --check || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metrics
+          path: metrics.json
+      - name: anything to do?
+        id: gate
+        run: |
+          open=$(gh pr list --label nightly-simplify --state open --json number --jq length)
+          new=$(git log --since="25 hours ago" --oneline origin/main | wc -l)
+          echo "run=$([ "$open" = 0 ] && { [ "$new" -gt 0 ] || [ "${{ github.event_name }}" = workflow_dispatch ]; } && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - name: shrink
+        if: steps.gate.outputs.run == 'yes'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow .github/prompts/nightly.md exactly. Current metrics: metrics.json. Today: run ${{ github.run_id }}.
+          claude_args: >-
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(python3 -m unittest:*),Bash(python3 tools/metrics.py:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git diff:*),Bash(git status:*),Bash(gh pr create:*),Bash(gh label create:*)"
+      - name: run CI on the nightly PR (PRs opened with the workflow token trigger no workflows)
+        if: steps.gate.outputs.run == 'yes'
+        run: |
+          pr=$(gh pr list --label nightly-simplify --state open --json number,headRefName --jq '.[0] // empty')
+          [ -n "$pr" ] || exit 0
+          gh workflow run test.yml -f ref="$(jq -r .headRefName <<<"$pr")"
+          gh workflow run review.yml -f pr="$(jq -r .number <<<"$pr")"
