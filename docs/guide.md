@@ -68,6 +68,17 @@ After `init`, commit the result (only the main session commits).
 
 `init` creates `.dpcli-local/README.md` once.
 
+## Self-improvement
+
+| Command | Does |
+|---|---|
+| `feedback [--since D] [--module M] [--all]` | frictions from `dp_feedback`, `harness:` notes and review `harness`: clusters F-n (open/fixed, `⚠N after fix`) and unclustered by topic |
+| `feedback show F-n\|TOPIC` | unique texts ×count with task IDs |
+| `feedback new "title" --match REGEX --scope project\|dpcli [--why]` | create a cluster F-n (ledger `.dpcli-local/feedback.jsonl`) |
+| `feedback fix F-n --where … [--pr URL]` · `wontfix F-n --why …` · `reopen F-n` | close / reject / reopen |
+| `stats [module] [--since D]` | tasks, created→accepted, rework rounds, frictions; check durations (median/max s) |
+| `contribute F-n [--title T] [--new]` | dpcli-scope fix from `.dpcli` branch `improve/*` → PR to the hub (origin or fork), or +1 on a similar open one; no commits → issue; no `gh` → `build/dpcli/contribute-F-n/` with issue text and patches |
+
 ## Config
 
 `dpcli.json` or `dpcli.yml`/`dpcli.yaml` at the project root (searched upward from the current directory to the git root; json wins if both exist). All keys are optional. Full list with comments and defaults — [`dpcli.example.yml`](../dpcli.example.yml). In brief:

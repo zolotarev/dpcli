@@ -1,0 +1,211 @@
+"""feedback (friction ledger: collect, dedup, clusters, triage, fix) and stats (durations, rework, frictions)."""
+import re
+import statistics
+
+from .. import config
+from ..journal import all_modules
+from ..util import CLI, DpError, append_jsonl, now, read_json, read_jsonl, short
+
+# dpcli commands and frequent topics: unclustered frictions are grouped by the first one mentioned
+TOPICS = ["task show", "task brief", "task new", "task set", "task note", "task sync", "accept", "report", "review",
+          "plan", "job", "lock", "merge", "sync", "gc", "deliver", "docs", "search", "status", "inbox", "init",
+          "module new", "scope", "stash", "worktree"]
+EMPTY = {"", "-", "—", "none", "no", "ok", "нет", "ок", "всё ок", "замечаний нет", "n/a"}
+
+
+def ledger_path():
+    return config.repo_path(config.get("local_dir", ".dpcli-local")) / "feedback.jsonl"
+
+
+def norm(s):
+    return re.sub(r"[\s.,;:!]+$", "", " ".join(str(s).split()).lower())
+
+
+def items(since="", module=None):
+    """[{t, module, task, text, src}] from the journals of all modules."""
+    out = []
+    for mod, home in all_modules().items():
+        if module and mod != module:
+            continue
+        for e in read_jsonl(home / "events.jsonl"):
+            t = e.get("t", "")
+            if t < since:
+                continue
+            if e.get("ev") == "reported" and e.get("dp_feedback"):
+                out.append({"t": t, "module": mod, "task": e.get("task"), "text": e["dp_feedback"], "src": "report"})
+            elif e.get("ev") == "note" and re.match(r"\s*harness:", e.get("note") or "", re.I):
+                out.append({"t": t, "module": mod, "task": e.get("task"), "src": "note",
+                            "text": re.sub(r"^\s*harness:\s*", "", e["note"], flags=re.I)})
+        for f in sorted((home / "tasks").glob("*.review.json")):
+            r = read_json(f) or {}
+            if r.get("harness") and r.get("t", "") >= since:
+                out.append({"t": r.get("t", ""), "module": mod, "task": f.name[:-12], "text": r["harness"], "src": "review"})
+    return [i for i in out if norm(i["text"]) not in EMPTY]
+
+
+def ledger():
+    """{F-n: {title, match, scope, why, status, t_fix, where, pr, t}} folded from feedback.jsonl."""
+    out = {}
+    for r in read_jsonl(ledger_path()):
+        fid, kind = r.get("id"), r.get("kind")
+        if kind == "cluster":
+            out[fid] = {**r, "status": "open"}
+        elif fid in out:
+            c = out[fid]
+            if kind == "fix":
+                c.update(status="fixed", t_fix=r["t"], where=r.get("where", ""), pr=r.get("pr", c.get("pr", "")))
+            elif kind == "wontfix":
+                c.update(status="wontfix", why=r.get("why", c.get("why", "")))
+            elif kind == "reopen":
+                c.update(status="open", t_fix="")
+            elif kind in ("pr", "issue"):
+                c["pr"] = r.get("url", "")
+    return out
+
+
+def topic(text):
+    low = text.lower()
+    hits = [(low.find(t), t) for t in TOPICS if re.search(rf"(?<![\w-]){re.escape(t)}(?![\w-])", low)]
+    return min(hits)[1] if hits else "other"
+
+
+def assign(its, clusters):
+    """(by cluster id, by topic) — an item goes to the first cluster whose regex matches, else to its topic."""
+    rx = [(fid, re.compile(c["match"], re.I)) for fid, c in clusters.items()]
+    by_c, by_t = {}, {}
+    for i in its:
+        fid = next((f for f, r in rx if r.search(i["text"])), None)
+        (by_c.setdefault(fid, []) if fid else by_t.setdefault(topic(i["text"]), [])).append(i)
+    return by_c, by_t
+
+
+def uniq(its):
+    """[(text, count, tasks)] by normalized text, most frequent first."""
+    g = {}
+    for i in its:
+        k = norm(i["text"])
+        x = g.setdefault(k, [i["text"], 0, []])
+        x[1] += 1
+        if i["task"] and i["task"] not in x[2]:
+            x[2].append(i["task"])
+    return sorted(g.values(), key=lambda x: -x[1])
+
+
+def cmd_feedback(a):
+    sub = a.sub or "list"
+    if sub == "new":
+        try:
+            re.compile(a.match)
+        except re.error as e:
+            raise DpError(f"--match: invalid regex ({e})")
+        n = 1 + max((int(f[2:]) for f in ledger() if f[2:].isdigit()), default=0)
+        fid = f"F-{n}"
+        append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "cluster", "title": a.title, "match": a.match,
+                                     "scope": a.scope, "why": a.why or ""})
+        print(f"{fid}: {a.title} [{a.scope}] → {CLI} feedback show {fid}")
+        return
+    led = ledger()
+    if sub in ("fix", "wontfix", "reopen"):
+        if a.id not in led:
+            raise DpError(f"{a.id}: no such cluster ({CLI} feedback)")
+        rec = {"t": now(), "id": a.id, "kind": sub}
+        rec.update({k: v for k, v in (("where", getattr(a, "where", None)), ("pr", getattr(a, "pr", None)),
+                                       ("why", getattr(a, "why", None))) if v})
+        append_jsonl(ledger_path(), rec)
+        print(f"{a.id}: {sub}")
+        return
+    its = items(a.since or "", a.module)
+    by_c, by_t = assign(its, led)
+    if sub == "show":
+        group = by_c.get(a.id) if a.id in led else by_t.get(a.id)
+        if group is None:
+            raise DpError(f"{a.id}: nothing (clusters F-n or topics: {', '.join(sorted(by_t)) or '-'})")
+        if a.id in led:
+            c = led[a.id]
+            print(f"{a.id} {c['title']} [{c['scope']}] {c['status']} · match /{c['match']}/" + (f" · {c['pr']}" if c.get("pr") else ""))
+        for text, cnt, tasks in uniq(group):
+            print(f"×{cnt} {short(text, 160 if not a.full else 10000)}" + (f" | {', '.join(tasks[:6])}" if tasks else ""))
+        return
+    print(f"frictions {len(its)}, unique {len(uniq(its))}" + (f" since {a.since}" if a.since else ""))
+    for fid, c in sorted(led.items(), key=lambda kv: int(kv[0][2:]) if kv[0][2:].isdigit() else 0):
+        if c["status"] != "open" and not a.all and c["status"] != "fixed":
+            continue
+        g = by_c.get(fid, [])
+        after = [i for i in g if c.get("t_fix") and i["t"] > c["t_fix"]]
+        print(f"{fid} ×{len(g)} [{c['scope']}] {c['status']}" + (f" ⚠{len(after)} after fix" if after else "")
+              + f" — {short(c['title'], 80)}" + (f" · {c['pr']}" if c.get("pr") else ""))
+    if by_t:
+        print(f"unclustered ({CLI} feedback show <topic>; cluster: {CLI} feedback new \"title\" --match REGEX --scope project|dpcli):")
+        for t, g in sorted(by_t.items(), key=lambda kv: -len(kv[1])):
+            u = uniq(g)
+            print(f"  {t} ×{len(g)} ({len(u)} unique): {short(u[0][0], 90)}")
+
+
+def cmd_stats(a):
+    mods = all_modules()
+    if a.module and a.module not in mods:
+        raise DpError(f"module {a.module} not found (have: {', '.join(mods) or 'none'})")
+    durs = {}
+    for mod, home in mods.items():
+        if a.module and mod != a.module:
+            continue
+        evs = [e for e in read_jsonl(home / "events.jsonl") if e.get("t", "") >= (a.since or "")]
+        created, accepted, rework, tasks = {}, {}, 0, set()
+        for e in evs:
+            tid = e.get("task")
+            if not tid:
+                continue
+            tasks.add(tid)
+            k = e.get("ev")
+            if k == "created":
+                created.setdefault(tid, e["t"])
+            elif k == "accepted":
+                accepted.setdefault(tid, e["t"])
+                for n, s in (e.get("durs") or {}).items():
+                    durs.setdefault(n, []).append(float(s))
+            elif k == "reviewed" and e.get("verdict") == "rework":
+                rework += 1
+        lead = [_hours(created[t], accepted[t]) for t in accepted if t in created]
+        nfr = len(items(a.since or "", mod))
+        print(f"{mod}: tasks {len(tasks)} accepted {len(accepted)} | created→accepted "
+              + (f"median {statistics.median(lead):.1f}h max {max(lead):.1f}h" if lead else "-")
+              + f" | rework {rework} | frictions {nfr}")
+    if durs:
+        print("checks, s (median/max): " + " · ".join(f"{n} {statistics.median(v):.0f}/{max(v):.0f}"
+                                                      for n, v in sorted(durs.items(), key=lambda kv: -max(kv[1]))))
+
+
+def _hours(t0, t1):
+    import datetime as dt
+    try:
+        return (dt.datetime.fromisoformat(t1) - dt.datetime.fromisoformat(t0)).total_seconds() / 3600
+    except ValueError:
+        return 0.0
+
+
+def register(sp):
+    q = sp.add_parser("feedback", help="friction ledger: list | show | new | fix | wontfix | reopen")
+    q.add_argument("sub", nargs="?", choices=["list", "show", "new", "fix", "wontfix", "reopen"])
+    q.add_argument("id", nargs="?", metavar="F-n|TOPIC|TITLE")
+    q.add_argument("--since", metavar="DATE"); q.add_argument("--module")
+    q.add_argument("--all", action="store_true", help="also wontfix clusters")
+    q.add_argument("--full", action="store_true")
+    q.add_argument("--match", metavar="REGEX", help="new: frictions of the cluster")
+    q.add_argument("--scope", choices=["project", "dpcli"], help="new: fixed in .dpcli-local/ or in dpcli itself")
+    q.add_argument("--why"); q.add_argument("--where", help="fix: where it was fixed (.dpcli-local/…, dpcli vN)")
+    q.add_argument("--pr", metavar="URL")
+    q.set_defaults(func=_dispatch)
+
+    q = sp.add_parser("stats", help="per module: tasks, created→accepted, rework rounds, frictions; check durations")
+    q.add_argument("module", nargs="?"); q.add_argument("--since", metavar="DATE")
+    q.set_defaults(func=cmd_stats)
+
+
+def _dispatch(a):
+    if a.sub == "new":
+        if not (a.id and a.match and a.scope):
+            raise DpError(f'{CLI} feedback new "title" --match REGEX --scope project|dpcli')
+        a.title = a.id
+    elif a.sub in ("show", "fix", "wontfix", "reopen") and not a.id:
+        raise DpError(f"{CLI} feedback {a.sub} <F-n{'|TOPIC' if a.sub == 'show' else ''}>")
+    return cmd_feedback(a)

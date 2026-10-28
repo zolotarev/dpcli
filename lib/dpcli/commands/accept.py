@@ -283,7 +283,7 @@ def cmd_accept(a):
     resf = logdir / "results.json"
     store = read_json(resf) or {}
     for name, ok, val, log, dur in res:
-        store[name] = {"ok": ok, "val": val, "t": now(), "head": head}
+        store[name] = {"ok": ok, "val": val, "t": now(), "head": head, "dur": round(dur)}
     write_json(resf, store)
     allnames = [c.get("name") for c in card.get("accept", [])]
     cur = {n: store[n] for n in allnames if n in store and store[n].get("head") == head}
@@ -299,7 +299,8 @@ def cmd_accept(a):
         full_set = n_ok == len(allnames)
         need_rev = agents.needs_review(card.get("type")) and not a.here and not a.no_review
         kind = "accepted" if allok and full_set and not a.no_accept and not need_rev else "checked"
-        add_event(home, a.id, kind, by_default(a), note=f"{n_ok}/{len(allnames)} {summ}", commits=a.commit)
+        add_event(home, a.id, kind, by_default(a), note=f"{n_ok}/{len(allnames)} {summ}", commits=a.commit,
+                  durs={name: round(dur) for name, ok, val, log, dur in res})
         if allok and full_set and need_rev:
             print(f"{a.id}: PASS -> review: {agents.reviewer_name()} (job: {CLI} task brief {a.id} --review), verdict: {CLI} review {a.id}")
     sys.exit(0 if allok else 1)

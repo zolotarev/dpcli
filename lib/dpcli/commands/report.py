@@ -144,6 +144,7 @@ REVIEW_TEMPLATE = {
                 "what": "what is wrong (contract, scope, test-fitting, bug, report != fact)",
                 "fix": "what to do"}],
     "rerun": [{"name": "check rerun by the reviewer", "value": "number/result", "pass": True}],
+    "harness": "process frictions you noticed: vague card, weak checks, missing command (optional)",
 }
 
 

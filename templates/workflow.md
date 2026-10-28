@@ -125,6 +125,7 @@ Every turn pays for the whole session context again: a short answer at 500k cont
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
-- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`. No status here.
-- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request. Result — ≤ 3 proposals to the user with cost and gain; approved project changes go to `.dpcli-local/` → `{{cli}} init` → commit; changes to dpcli itself — a PR to the dpcli repository; decision — `{{cli}} decide harness …`.
+- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`. No status here.
+- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 proposals to the user.
+- **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — never edited in place: a branch `improve/*` in `.dpcli` and `{{cli}} contribute F-n` (a PR to the dpcli hub or a +1 on a similar one); everyone gets it with the next update.
 - The user's remarks about the work — into memory (feedback) at once, without waiting for a review.

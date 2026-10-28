@@ -1,16 +1,17 @@
 ---
 name: harness-retro
-description: "Review the {{project}} process (harness) — collect `harness:` frictions and `dp_feedback`, measure token usage per session, propose ≤ 3 improvements to the user and apply the approved ones. Used by the main session on `<m> done`, once per phase, or when the user asks to improve the process or cut costs."
+description: "Review the {{project}} process (harness) — cluster frictions with `dpcli feedback`, measure with `dpcli stats` and token usage, propose ≤ 3 improvements to the user, apply the approved: project ones in .dpcli-local/, dpcli ones as a PR to the dpcli hub. Used by the main session on `<m> done`, once per phase, or when the user asks to improve the process or cut costs."
 ---
 
 # harness-retro — process review
 
 Cheap: one session, no subagents, only the commands below. Don't read project code.
 
-1. **Since when.** `{{cli}} log harness` — date of the last `retro:`. No module — `{{cli}} module init harness`, period — from the start.
-2. **Frictions.** `{{cli}} search "harness:"` and `{{cli}} search "dpcli:"` (old notes) — only entries after the date from step 1, plus `dp_feedback` of reports.
-3. **Cost.** `python3 .claude/skills/harness-retro/cost.py --since <YYYY-MM-DD>`: sessions, turns, average and max context, main/subagent share, models. Alarming: main session average context > 200k, a session longer than a phase, Opus on agents outside the models table.
-4. **Group.** Recurring (≥ 2 times) or expensive (cost, rework rounds). One-offs — skip.
-5. **Propose to the user** as one list, ≤ 3 items: `what hurt (refs: ID/module) → change (file) → gain/cost`. Change nothing without approval.
-6. **Apply the approved.** Project-specific — in `.dpcli-local/` (`workflow.md`, `claude-md.md`, `agents/<name>.append.md`, `skills/`), then `{{cli}} init`, commit `.dpcli-local/`, `.claude/`, `CLAUDE.md`. A change to dpcli itself — never edit `.dpcli/` in place: a PR to the dpcli repository.
-7. **Record.** Each decision — `{{cli}} decide harness "<change>" --by user --why "<friction>"`; summary — `{{cli}} event harness note --note "retro: <date>; accepted N, rejected M"`.
+1. **State.** `{{cli}} feedback` — clusters F-n (open / fixed, `⚠N after fix` = the fix did not work) and unclustered frictions by topic. `{{cli}} stats` — rework rounds, created→accepted, slow checks. `python3 .claude/skills/harness-retro/cost.py --since <YYYY-MM-DD>` — tokens: alarming if the main session's average context > 200k or Opus runs outside the models table.
+2. **Cluster.** For a recurring topic (≥ 2) read `{{cli}} feedback show <topic>`, then `{{cli}} feedback new "<anonymized title>" --match "<regex>" --scope project|dpcli --why "<one line>"`. Scope `project` — specific to this codebase or team (fixed in `.dpcli-local/`); `dpcli` — would hurt any project (fixed in dpcli itself). Titles never contain project names, paths or quotes.
+3. **Propose to the user** as one list, ≤ 3 items, most frequent/expensive first: `F-n ×count [scope] → change (file) → gain/cost`. Change nothing without approval.
+4. **Apply the approved.**
+   - project: edit `.dpcli-local/` (`workflow.md`, `claude-md.md`, `agents/<name>.append.md`, `skills/`), `{{cli}} init`, commit `.dpcli-local/ .claude/ CLAUDE.md`, then `{{cli}} feedback fix F-n --where .dpcli-local/<file>`;
+   - dpcli: in `.dpcli` — `git -C .dpcli switch -c improve/F-n-<slug>`, a test reproducing the friction, the change, `VERSION` +1, a `CHANGELOG.md` line, commit, then `{{cli}} contribute F-n` (PR from origin or a fork, or a +1 on a similar open one). If it hurts now, add a temporary workaround in `.dpcli-local/` marked `until: <PR url>`. `dpcli update` reports the verdict later.
+   - rejected by the user — `{{cli}} feedback wontfix F-n --why "…"`.
+5. **Record.** `{{cli}} decide harness "<change>" --by user --why "F-n"` per decision.
