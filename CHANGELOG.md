@@ -1,5 +1,8 @@
 # Changelog
 
+## 10
+- `task show` prints addenda in full (they were cut at 300 characters; executors missed instructions added after the brief); older than the last five — counted, shown with `--full`.
+
 ## 9
 - `gc`: one `git status --ignored` per copy per run instead of one per (branch × copy) — 25 merged copies: 6.6 s → 0.9 s. Removed copies no longer block neighbours.
 - Process rule: fast tools for agents (`rg`, `fd`, `jq`, `ast-grep`, Read with offset instead of `cat`/`sed -n`, scripts instead of long heredocs); `install.sh --tools` installs them.
