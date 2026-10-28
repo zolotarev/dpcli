@@ -9,9 +9,12 @@ permissions:
   issues: write
   id-token: write
   actions: write
+  checks: read  # needed by the reused review workflow
 jobs:
   shrink:
     runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ steps.ci.outputs.pr }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -62,10 +65,18 @@ jobs:
           name: nightly-transcript
           path: ${{ steps.shrink.outputs.execution_file }}
           retention-days: 1
-      - name: run CI on the nightly PR (PRs opened with the workflow token trigger no workflows)
+      - name: run tests on the nightly PR (PRs opened with the workflow token trigger no workflows)
+        id: ci
         if: steps.gate.outputs.run == 'yes'
         run: |
           pr=$(gh pr list --label nightly-simplify --state open --json number,headRefName --jq '.[0] // empty')
           [ -n "$pr" ] || exit 0
           gh workflow run test.yml -f ref="$(jq -r .headRefName <<<"$pr")"
-          gh workflow run review.yml -f pr="$(jq -r .number <<<"$pr")"
+          echo "pr=$(jq -r .number <<<"$pr")" >> "$GITHUB_OUTPUT"
+  review:
+    needs: shrink
+    if: needs.shrink.outputs.pr != ''
+    uses: ./.github/workflows/review.yml
+    with:
+      pr: ${{ needs.shrink.outputs.pr }}
+    secrets: inherit

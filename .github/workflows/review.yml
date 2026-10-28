@@ -7,6 +7,11 @@ on:
       pr:
         description: PR number (for PRs opened by workflows)
         required: true
+  workflow_call:  # the nightly job reviews its own PR in-run: the actor stays whoever started the nightly
+    inputs:
+      pr:
+        type: string
+        required: true
 concurrency:
   group: review-${{ github.event.pull_request.number || inputs.pr }}
   cancel-in-progress: true
