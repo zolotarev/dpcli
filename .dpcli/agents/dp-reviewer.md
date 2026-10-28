@@ -1,7 +1,7 @@
 ---
 name: dp-reviewer
 description: Ревьюер задачи {{project}} с пустым контекстом — после PASS в `{{cli}} accept` проверяет работу исполнителя (тип с ревью) по карточке, плану, контрактам и диффу ветки; вердикт accept|rework пишет в журнал (`{{cli}} review`). Файлы не правит, не коммитит, не сливает. Запускает координатор модуля; для самых сложных задач — с более сильной моделью.
-model: opus
+model: sonnet
 effort: medium
 disallowedTools: [Agent, Edit, Write, NotebookEdit, WebSearch, WebFetch]
 dpcli_role: reviewer
