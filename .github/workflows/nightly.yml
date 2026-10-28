@@ -71,7 +71,7 @@ jobs:
         run: |
           pr=$(gh pr list --label nightly-simplify --state open --json number,headRefName --jq '.[0] // empty')
           [ -n "$pr" ] || exit 0
-          gh workflow run test.yml -f ref="$(jq -r .headRefName <<<"$pr")"
+          b=$(jq -r .headRefName <<<"$pr"); gh workflow run test.yml --ref "$b" -f ref="$b"  # --ref: the run belongs to the PR head commit
           echo "pr=$(jq -r .number <<<"$pr")" >> "$GITHUB_OUTPUT"
   review:
     needs: shrink
