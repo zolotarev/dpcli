@@ -22,7 +22,7 @@ flowchart LR
 | 3 | Auto-update | `dpcli update [--auto] [--pin vN]` on SessionStart once a day: fast-forward to the latest tag, re-render with the project layer, commit the submodule pointer; report the fate of own PRs (merged / rework / rejected) |
 | 4 | Installer | `curl … install.sh \| bash`: submodule, config (language, worktree setup), `init`, optional modern tools; migrates a vendored copy |
 | 5 | Fast tools | Agents use `rg`, `fd`, `jq`, `ast-grep`, Read with offset; dpcli batches git calls in `status`/`gc` and pre-filters with `rg` |
-| 5b | The hub's CI | `test.yml` (tests, VERSION/CHANGELOG, anonymity, budgets), `review.yml` (AI verdict), `merge.yml` (merge + tag), `nightly.yml` (measure lightness, one shrinking PR) |
+| 5b | The hub's CI | `test.yml` (tests, VERSION/CHANGELOG, anonymity, budgets), `review.yml` (AI verdict; `tools/decide.py` merges + tags, labels rework or closes), `nightly.yml` (measure lightness, one shrinking PR) |
 | ✓ | Phases 0a–5b | released in v4–v9 and the hub CI |
 | 6+ | Fixes driven by the ledger | Ordered by frequency of `feedback` issues and their `+1`s |
 

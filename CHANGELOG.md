@@ -1,5 +1,8 @@
 # Changelog
 
+## 11
+- `update` also commits the re-rendered process description (`workflow`, `.claude/dpcli-workflow.md` by default); it was left uncommitted when a release changed it.
+
 ## 10
 - `task show` prints addenda in full (they were cut at 300 characters; executors missed instructions added after the brief); older than the last five — counted, shown with `--full`.
 
