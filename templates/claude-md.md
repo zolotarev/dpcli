@@ -1,13 +1,14 @@
-## Процесс работы с агентами (dpcli)
+## Working with agents (dpcli)
 
-Перед многошаговой работой — прочитать **`{{workflow}}`**. Журнал, задачи, ветки, документы — только `{{cli}}` (`{{cli}} -h`).
+Before multi-step work read **`{{workflow}}`**. Journal, tasks, branches, docs — only via `{{cli}}` (`{{cli}} -h`).
 
-- Роли: пользователь — решения; главная сессия — планы, координаторы модулей, отчёт по событию (шлюз, `<м> done`) или запросу, слияния в `{{main_branch}}` по одобрению; `dp-coordinator` — контракты, карточки, приёмка, шлюзы; исполнитель — одна задача в своей копии.
-- Сообщения — по протоколу ({{workflow}}, «Протокол сообщений»): ID и команды, без пересказа журнала.
-- Детерминированное — командами `{{cli}}`; журнал `{{plan_dir}}/<м>/` только дописывается.
-- Корректность прежде «нравится»; не выдумывать; не шлифовать.
-- Одна сессия — одна фаза/модуль: после слияния или смены темы — `/clear`, состояние — из журнала.
-- Трения процесса — сразу одной строкой `harness: …` (в `dp_feedback` или `event <м> note`); разбор и правки процесса — скилл `harness-retro`, только с одобрения пользователя.
-- Документы — вход `{{docs_dir}}/INDEX.md`; искать `{{cli}} docs find`, читать по разделам `{{cli}} docs section <путь> [раздел]`, не целиком.
-- Коммиты — только свои файлы (`git commit -- <пути>`); не пушить без команды пользователя.
-- Агенты — `.dpcli/agents/`, процесс — `.dpcli/templates/workflow.md`; `.claude/` обновляет `{{cli}} init`.
+- Language: replies, reports, journal, plans, docs — {{language_text}}; commit messages — {{language_commits}}.
+- Roles: user — decisions; main session — plans, module coordinators, reports on events (gate, `<m> done`) or on request, merges into `{{main_branch}}` on approval; `dp-coordinator` — contracts, cards, acceptance, gates; executor — one task in its own copy.
+- Messages follow the protocol ({{workflow}}, "Message protocol"): IDs and commands, no retelling of the journal.
+- Deterministic work — `{{cli}}` commands; the journal `{{plan_dir}}/<m>/` is append-only.
+- Correctness over "looks nice"; don't invent; don't polish.
+- One session — one phase/module: after a merge or a change of topic — `/clear`, state comes from the journal.
+- Process frictions — at once, one line `harness: …` (in `dp_feedback` or `event <m> note`); review and process changes — skill `harness-retro`, only with the user's approval.
+- Docs — entry `{{docs_dir}}/INDEX.md`; find with `{{cli}} docs find`, read by section `{{cli}} docs section <path> [section]`, not whole.
+- Commits — only your own files (`git commit -- <paths>`); no push without the user's command.
+- Agents — `.dpcli/agents/`, process — `.dpcli/templates/workflow.md`; `.claude/` is refreshed by `{{cli}} init`.

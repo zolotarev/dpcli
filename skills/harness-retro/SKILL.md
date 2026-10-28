@@ -1,16 +1,16 @@
 ---
 name: harness-retro
-description: Разбор процесса {{project}} (harness) — собрать трения `harness:` и `dp_feedback`, замерить расход токенов по сессиям, предложить пользователю ≤ 3 улучшений и внести одобренные. Использовать главной сессии по `<м> done`, раз в фазу или когда пользователь просит улучшить процесс или сократить расход.
+description: "Review the {{project}} process (harness) — collect `harness:` frictions and `dp_feedback`, measure token usage per session, propose ≤ 3 improvements to the user and apply the approved ones. Used by the main session on `<m> done`, once per phase, or when the user asks to improve the process or cut costs."
 ---
 
-# harness-retro — разбор процесса
+# harness-retro — process review
 
-Дёшево: одна сессия, без субагентов, только команды ниже. Код проекта не читать.
+Cheap: one session, no subagents, only the commands below. Don't read project code.
 
-1. **С какого момента.** `{{cli}} log harness` — дата последнего `retro:`. Модуля нет — `{{cli}} module init harness`, период — с начала.
-2. **Трения.** `{{cli}} search "harness:"` и `{{cli}} search "dpcli:"` (старые заметки) — только записи после даты из п. 1. Отчёты исполнителей: `dp_feedback` попадает в `search` по тем же словам.
-3. **Расход.** `python3 .claude/skills/harness-retro/cost.py --since <YYYY-MM-DD>`: сессии, ходы, средний и максимальный контекст, доля главной/субагентов, модели. Тревожно: средний контекст главной > 200k, сессия дольше фазы, Opus у агентов вне таблицы моделей.
-4. **Сгруппировать.** Повторяющееся (≥ 2 раз) или дорогое (расход, круги доработки). Разовое — пропустить.
-5. **Предложить пользователю** одним списком, ≤ 3 пункта: `что мешало (ссылки: ID/модуль) → правка (файл) → выигрыш/цена`. Без одобрения ничего не менять.
-6. **Внести одобренное** в источник: `.dpcli/templates/workflow.md`, `.dpcli/templates/claude-md.md`, `.dpcli/agents/*.md`, `.dpcli/skills/**`; правка самой dpcli — задача в модуле, не здесь. Затем `{{cli}} init`, `git diff --stat`, коммит только этих файлов и `.claude/`, `CLAUDE.md`.
-7. **Записать.** Каждое решение — `{{cli}} decide harness "<правка>" --by user --why "<трение>"`; итог — `{{cli}} event harness note --note "retro: <дата>; принято N, отклонено M"`.
+1. **Since when.** `{{cli}} log harness` — date of the last `retro:`. No module — `{{cli}} module init harness`, period — from the start.
+2. **Frictions.** `{{cli}} search "harness:"` and `{{cli}} search "dpcli:"` (old notes) — only entries after the date from step 1, plus `dp_feedback` of reports.
+3. **Cost.** `python3 .claude/skills/harness-retro/cost.py --since <YYYY-MM-DD>`: sessions, turns, average and max context, main/subagent share, models. Alarming: main session average context > 200k, a session longer than a phase, Opus on agents outside the models table.
+4. **Group.** Recurring (≥ 2 times) or expensive (cost, rework rounds). One-offs — skip.
+5. **Propose to the user** as one list, ≤ 3 items: `what hurt (refs: ID/module) → change (file) → gain/cost`. Change nothing without approval.
+6. **Apply the approved** in the source: `.dpcli/templates/workflow.md`, `.dpcli/templates/claude-md.md`, `.dpcli/agents/*.md`, `.dpcli/skills/**`; a change to dpcli itself is a task in a module, not here. Then `{{cli}} init`, `git diff --stat`, commit only these files and `.claude/`, `CLAUDE.md`.
+7. **Record.** Each decision — `{{cli}} decide harness "<change>" --by user --why "<friction>"`; summary — `{{cli}} event harness note --note "retro: <date>; accepted N, rejected M"`.

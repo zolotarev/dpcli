@@ -1,4 +1,4 @@
-"""Тесты area модулей, причин решений, закрытия плана и контрактов при сдаче, INDEX.md по подпроектам, deliver --rerender."""
+"""Module areas, decision reasons, closing plan and contracts on delivery, INDEX.md by area, deliver --rerender."""
 import argparse
 import json
 import sys
@@ -62,7 +62,7 @@ class Area(RepoCase):
         self.cfg(areas=["web", "api"])
         with self.assertRaises(DpError) as e:
             check_area(None)
-        self.assertIn("спросить разработчика", str(e.exception))
+        self.assertIn("ask the developer", str(e.exception))
         with self.assertRaises(DpError):
             check_area("other")
         check_area("web")
@@ -79,7 +79,7 @@ class Area(RepoCase):
         (d / "pay.md").write_text(PLAN)
         (d / "cat.md").write_text(PLAN.replace("module: pay", "module: cat\narea: nope"))
         out = self.check()
-        self.assertIn("docs/plan/pay.md: нет area", out)
+        self.assertIn("docs/plan/pay.md: module document has no area", out)
         self.assertIn("docs/plan/cat.md: area 'nope'", out)
 
     def check(self):
@@ -126,12 +126,12 @@ class DeliverArea(DeliverBase):
         self.assertEqual((contract["status"], contract["area"]), ("closed", "web"))
         dec, body = docs.split_fm((self.main / "docs/plan/pay/decisions.md").read_text())
         self.assertEqual((dec["area"], dec["archive"]), ("web", "archive/pay"))
-        self.assertIn("в git: `archive/pay`", body)
+        self.assertIn("in git: `archive/pay`", body)
         idx = (self.main / "docs/INDEX.md").read_text()
         self.assertIn("## web\n", idx)
         self.assertNotIn("## api", idx)  # пустые подпроекты не выводятся
         self.assertIn("- **pay** — Оплата плана [closed", idx)
-        self.assertIn("[решения](plan/pay/decisions.md) · [сводка](plan/pay/summary.md) · полный журнал: `archive/pay`", idx)
+        self.assertIn("[decisions](plan/pay/decisions.md) · [summary](plan/pay/summary.md) · full journal: `archive/pay`", idx)
         self.assertIn("docs/INDEX.md", gitx.git("ls-files", "--", "docs", cwd=self.main).splitlines())
         self.assertEqual(gitx.dirty(self.main), [])
 
@@ -158,13 +158,13 @@ class DeliverArea(DeliverBase):
         deliver.cmd_deliver(args(self.MOD, rerender=True, from_="archive/old", area="web"))
         dec, body = docs.split_fm((self.main / "docs/plan/pay/decisions.md").read_text())
         self.assertEqual((dec["area"], dec["archive"]), ("web", "archive/old"))
-        self.assertIn("- 2026-10-01 — Платим в USD *Почему:* так проще", body)
+        self.assertIn("- 2026-10-01 — Платим в USD *Why:* так проще", body)
         self.assertEqual(sorted(p.name for p in (self.main / "docs/plan/pay").iterdir()), ["decisions.md", "summary.md"])
         self.cfg(areas=["web"], deliver={"keep": ["decisions.md", "summary.md"], "archive_tag": False})
         deliver.cmd_deliver(args(self.MOD, rerender=True, from_="archive/old", area="web"))
         dec, body = docs.split_fm((self.main / "docs/plan/pay/decisions.md").read_text())
         self.assertNotIn("archive", dec)  # теги выключены — ссылки на журнал нет
-        self.assertNotIn("Полный журнал", body)
+        self.assertNotIn("Full journal", body)
         plan = docs.split_fm((self.main / "docs/plan/pay.md").read_text())[0]
         self.assertEqual((plan["status"], plan["updated"]), ("closed", "2026-10-02"))  # последняя запись журнала
         self.assertTrue((self.main / "docs/INDEX.md").exists())
@@ -172,7 +172,7 @@ class DeliverArea(DeliverBase):
 
 
 class IndexConflict(RepoCase):
-    """Две ветки добавляют по модулю — INDEX.md конфликтует; merge dpcli пересобирает его сам."""
+    """Two branches add a module each — INDEX.md conflicts; dpcli merge rebuilds it itself."""
 
     def plan(self, mod, upd):
         p = self.main / "docs/plan" / f"{mod}.md"
@@ -213,7 +213,7 @@ class IndexConflict(RepoCase):
 
 
 class FeatureBase(DeliverBase):
-    """Обычный путь: модуль заведён от фичеветки, сдаётся в неё; в main dpcli сам не вливает."""
+    """Usual path: module created from a feature branch and delivered into it; dpcli never merges into main by itself."""
 
     def setUp(self):
         super().setUp()
@@ -236,7 +236,7 @@ class FeatureBase(DeliverBase):
         self.module_copy()
         with self.assertRaises(DpError) as e:
             deliver.cmd_deliver(args(self.MOD, into="main"))
-        self.assertIn("через MR", str(e.exception))
+        self.assertIn("only via a feature-branch MR", str(e.exception))
 
     def test_merge_task_defaults_to_module_branch(self):
         from dpcli.commands import branches
@@ -255,7 +255,7 @@ class FeatureBase(DeliverBase):
         self.cfg(protect_main=True)
         with self.assertRaises(DpError) as e:  # в main — только явным --into main
             guard_main("main", False)
-        self.assertIn("явного --into main", str(e.exception))
+        self.assertIn("explicit --into main", str(e.exception))
 
     def test_module_new_from_current_branch(self):
         from dpcli.commands import branches
@@ -266,7 +266,7 @@ class FeatureBase(DeliverBase):
         self.assertEqual(meta["base"], "feat")  # база — текущая ветка главной копии (фичеветка)
         with self.assertRaises(DpError) as e:  # модуль не заводят от ветки другого модуля
             branches.cmd_module_new(argparse.Namespace(module="dog", from_="feature/cat", **new))
-        self.assertIn("фичеветки", str(e.exception))
+        self.assertIn("feature branch", str(e.exception))
 
 
 

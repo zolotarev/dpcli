@@ -1,4 +1,4 @@
-"""Тесты исправлений dpcli: пути с пробелами/кириллицей, docs check, ссылки на контракты, копии (git-crypt, gc)."""
+"""dpcli fixes: paths with spaces/Cyrillic, docs check, contract links, copies (git-crypt, gc)."""
 import os
 import subprocess
 import sys
@@ -18,7 +18,7 @@ def sh(*args, cwd):
 
 
 class RepoCase(unittest.TestCase):
-    """Временный репозиторий main в tmp/main; cwd процесса — в нём."""
+    """Temporary main repository in tmp/main; the process cwd is inside it."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -204,11 +204,11 @@ class Copies(RepoCase):
         path = self.make_copy()
         (path / "new.txt").write_text("работа")
         why, _ = branches.remove_copy(path)
-        self.assertIn("неотслеживаемые", why)
+        self.assertIn("untracked files", why)
         (path / "new.txt").unlink()
         (path / "a.txt").write_text("changed")
         why, _ = branches.remove_copy(path)
-        self.assertIn("грязная", why)
+        self.assertIn("dirty copy", why)
         self.assertTrue(path.exists())
 
 

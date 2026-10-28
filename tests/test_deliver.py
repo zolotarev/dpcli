@@ -1,4 +1,4 @@
-"""Тесты deliver: squash ветки модуля без журнала, md для людей, архивный тег; свёртка журнала на месте."""
+"""deliver: squash of the module branch without the journal, md for people, archive tag; in-place journal fold."""
 import argparse
 import json
 import sys
@@ -27,7 +27,7 @@ def args(module, **kw):
 
 
 class DeliverBase(RepoCase):
-    """Журнал модуля pay и копия его ветки — без тестов, для наследников."""
+    """Journal of module pay and a copy of its branch — no tests, base for subclasses."""
     MOD = "pay"
 
     def journal(self, root, accepted=True):
@@ -72,8 +72,8 @@ class DeliverBase(RepoCase):
 
 class Deliver(DeliverBase):
 
-    def test_squash_drops_journal_and_keeps_md(self):
-        self.cfg()
+    def _squash(self, lang, ans, why, dec_h, chk, **over):
+        self.cfg(**over)
         copy = self.module_copy()
         deliver.cmd_deliver(args(self.MOD))
         self.assertEqual(gitx.git("log", "-1", "--format=%s", cwd=self.main), "pay: pay — оплата")
@@ -83,17 +83,24 @@ class Deliver(DeliverBase):
                          ["docs/plan/pay.md", "docs/plan/pay/decisions.md", "docs/plan/pay/summary.md"])
         dec = (self.main / "docs/plan/pay/decisions.md").read_text()
         self.assertIn("### Q1", dec)
-        self.assertIn("**Ответ** (пользователь, 2026-10-01): Да, обязателен", dec)
-        self.assertIn("Платим в USD *Почему:* так проще", dec)
-        self.assertNotIn("Да, обязателен *Почему", dec.split("## Решения")[1])  # ответ не дублируется в решениях
+        self.assertIn(f"**{ans[0]}** ({ans[1]}, 2026-10-01): Да, обязателен", dec)
+        self.assertIn(f"Платим в USD *{why}:* так проще", dec)
+        self.assertNotIn(f"Да, обязателен *{why}", dec.split(dec_h)[1])  # ответ не дублируется в решениях
         summ = (self.main / "docs/plan/pay/summary.md").read_text()
         self.assertLess(summ.index("PY-2"), summ.index("PY-10"))
-        self.assertIn("`x.ts` — не гонял format — проверено: generate", summ)
+        self.assertIn(f"`x.ts` — не гонял format — {chk}: generate", summ)
         self.assertNotIn("шум", summ)
         self.assertNotIn("jest", summ)
         self.assertEqual(gitx.git("rev-parse", "archive/pay"), gitx.git("rev-parse", "feature/pay"))
         ev = (copy / "docs/plan/pay/events.jsonl").read_text().splitlines()[-1]
         self.assertEqual(json.loads(ev)["ev"], "delivered")
+
+    def test_squash_drops_journal_and_keeps_md(self):
+        self._squash("en", ("Answer", "user"), "Why", "## Decisions", "checked")
+
+    def test_squash_ru(self):  # language.text ru: generated text stays Russian
+        self._squash("ru", ("Ответ", "пользователь"), "Почему", "## Решения", "проверено",
+                     language={"text": "ru", "commits": "ru"})
 
     def test_refuses_open_tasks(self):
         self.cfg()

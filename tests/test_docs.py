@@ -17,7 +17,7 @@ class Docs(unittest.TestCase):
 
     def test_check_ok(self):
         out = self.p.ok("docs", "check")
-        self.assertIn("ошибок 0", out)
+        self.assertIn("errors 0", out)
 
     def test_check_errors(self):
         d = self.p.root / "docs"
@@ -25,15 +25,15 @@ class Docs(unittest.TestCase):
         (d / "bad.md").write_text('---\ntype: bogus\nstatus: active\nsummary: "s"\n---\n[x](nope.md)\n', encoding="utf-8")
         code, out, err = self.p.run("docs", "check")
         self.assertEqual(code, 1)
-        self.assertIn("nofm.md: нет frontmatter", out)
+        self.assertIn("nofm.md: no frontmatter", out)
         self.assertIn("bogus", out)
-        self.assertIn("битая ссылка nope.md", out)
+        self.assertIn("broken link nope.md", out)
 
     def test_exclude_archive(self):
         arch = self.p.root / "docs" / "archive"
         arch.mkdir()
         (arch / "old.md").write_text("без frontmatter\n", encoding="utf-8")
-        self.assertIn("ошибок 0", self.p.ok("docs", "check"))
+        self.assertIn("errors 0", self.p.ok("docs", "check"))
 
     def test_index(self):
         out = self.p.ok("docs", "index")
@@ -43,7 +43,7 @@ class Docs(unittest.TestCase):
         self.assertIn("b.md", idx)
         self.assertTrue((self.p.root / "docs" / "registry" / "research.md").is_file())
 
-    # docs index создаёт заготовку registry/findings.md (на неё ссылается INDEX.md) — check сразу чистый
+    # docs index creates a registry/findings.md stub (INDEX.md links to it) — check is clean right away
     def test_check_after_index(self):
         self.p.ok("docs", "index")
         code, out, err = self.p.run("docs", "check")
@@ -58,7 +58,7 @@ class Docs(unittest.TestCase):
         (self.p.root / "docs" / "c.md").write_text('---\ntype: guide\nsummary: "s"\n---\n# C\n', encoding="utf-8")
         code, out, _ = self.p.run("docs", "check")
         self.assertEqual(code, 1)
-        self.assertIn("c.md: нет status", out)
+        self.assertIn("c.md: no status", out)
         self.assertNotIn("None", out)
 
     def test_find(self):
@@ -100,7 +100,7 @@ class Docs(unittest.TestCase):
         self.assertIn("таблица", out)
         self.assertIn("# не заголовок", out)
         self.assertNotIn("итог-текст", out)
-        # точное совпадение важнее начала; форма путь#раздел
+        # exact match beats prefix; path#section form
         self.assertIn("итог-текст", self.p.ok("docs", "section", "docs/s.md", "итоги"))
         self.assertIn("второй", self.p.ok("docs", "section", "docs/s.md#Итоги прогона"))
 
@@ -108,14 +108,14 @@ class Docs(unittest.TestCase):
         self._sec_doc()
         code, out, _ = self.p.run("docs", "section", "docs/s.md", "Ито")
         self.assertEqual(code, 1)
-        self.assertIn("неоднозначен", out)
+        self.assertIn("ambiguous", out)
         self.assertIn("  2", out)
         self.assertIn("  4", out)
         code, _, err = self.p.run("docs", "section", "docs/s.md", "нет такого")
         self.assertEqual(code, 1)
-        self.assertIn("не найден", err)
+        self.assertIn("not found", err)
 
-    # ---------- размер и summary ----------
+    # ---------- size and summary ----------
     def _big(self, path, extra=""):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f'---\ntype: guide\nstatus: active\nsummary: "s"\n{extra}---\n' + "x" * 3000 + "\n", encoding="utf-8")
@@ -128,15 +128,15 @@ class Docs(unittest.TestCase):
         self._big(p.root / "docs" / "gen.md", "generated: true\n")
         code, out, _ = p.run("docs", "check")
         self.assertEqual(code, 1, out)
-        self.assertIn("ОШИБКА  docs/big.md", out)
-        self.assertIn("разбить на разделы-файлы или вынести данные", out)
-        self.assertNotIn("old.md: 3 КБ", out)
-        self.assertNotIn("gen.md: 3 КБ", out)
+        self.assertIn("ERROR    docs/big.md", out)
+        self.assertIn("split into section files or move the data out", out)
+        self.assertNotIn("old.md: 3 KB", out)
+        self.assertNotIn("gen.md: 3 KB", out)
         q = Project({"docs": {"max_kb": 2, "max_kb_mode": "warn"}})
         self.addCleanup(q.cleanup)
         self._big(q.root / "docs" / "big.md")
         out = q.ok("docs", "check")
-        self.assertIn("предупр. docs/big.md", out)
+        self.assertIn("WARNING  docs/big.md", out)
 
     def test_summary_rules(self):
         d = self.p.root / "docs"
@@ -145,9 +145,9 @@ class Docs(unittest.TestCase):
         (d / "none.md").write_text('---\ntype: guide\nstatus: active\n---\n', encoding="utf-8")
         code, out, _ = self.p.run("docs", "check")
         self.assertEqual(code, 1)
-        self.assertIn("long.md: summary 141 симв. > 140", out)
-        self.assertIn("todo.md: summary TODO — заполнить summary: вывод/назначение в одну строку", out)
-        self.assertIn("none.md: нет summary", out)
+        self.assertIn("long.md: summary 141 chars > 140", out)
+        self.assertIn("todo.md: summary TODO — fill in summary: finding/purpose in one line", out)
+        self.assertIn("none.md: no summary", out)
         p = Project({"docs": {"summary_max": 200}})
         self.addCleanup(p.cleanup)
         (p.root / "docs").mkdir()
@@ -165,7 +165,7 @@ class Docs(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("raw.md: summary TODO", out)
 
-    # ---------- компактный индекс, реестры ----------
+    # ---------- compact index, registries ----------
     def test_index_compact(self):
         arch = self.p.root / "docs" / "archive"
         arch.mkdir()
@@ -177,8 +177,8 @@ class Docs(unittest.TestCase):
         self.assertNotRegex(body, r"(?m)^\|")  # без таблиц
         self.assertIn("- [docs/a.md](a.md) — Про альфа\n", idx)
         self.assertIn("- [docs/b.md](b.md) — Бета [idea]", idx)
-        self.assertIn("## Описания систем (guide)", idx)
-        self.assertIn("архив: 2 документов — `.dpcli/dpcli docs find --status closed`", idx)
+        self.assertIn("## System guides (guide)", idx)
+        self.assertIn("archive: 2 documents: `.dpcli/dpcli docs find --status closed`", idx)
         self.assertNotIn("x.md", idx)
         for w in ("docs find", "docs section", "docs findings"):
             self.assertIn(w, idx)

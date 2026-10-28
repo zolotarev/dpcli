@@ -1,57 +1,42 @@
-# ROADMAP
+# Roadmap
 
-Цель — инструмент, который улучшает себя по ходу работы: агенты сообщают о трениях, dpcli их сводит и меряет, улучшения подтверждаются цифрами, а не ощущениями.
+Goal: a self-improving network with a single hub. Every project using dpcli logs the frictions its agents hit, fixes project-specific ones locally and sends dpcli-level fixes here as pull requests; CI reviews and merges them; every project picks them up on its next update.
 
-## Исходные данные (октябрь 2026, один проект, ~20 модулей)
-186 отзывов исполнителей (`dp_feedback`), многие — одно и то же по 3–5 раз: петли обратной связи не было. Кластеры (число жалоб; отзыв может входить в несколько):
+```mermaid
+flowchart LR
+  A[project A] -- PR / issue 'feedback' --> H[(zolotarev/dpcli)]
+  B[project B] -- PR / issue 'feedback' --> H
+  H -- CI: tests · budgets · AI review --> M{verdict}
+  M -- accept: merge + tag vN --> U[dpcli update in every project]
+  M -- rework / reject + arguments --> A
+  N[nightly: measure & shrink] --> H
+```
 
-| Боль | Жалоб | Причина |
+## Phases
+
+| # | Phase | What it delivers |
 |---|---|---|
-| `accept --dry` идёт 2–15 мин в foreground, упирается в таймаут инструмента агента; параллельные прогоны мешают друг другу | 45 | фон (`--bg`) надо знать заранее; таймаут проверки не задать из CLI; длительности не хранятся |
-| раздел плана из карточки не находится (`plan <м> 4. Задачи (X-5)`) | 31 | раздел из нескольких слов без кавычек ломает разбор; `plan_ref` не проверяется при `task new` |
-| ложные FAIL проверки `scope` | 30 | свободный текст («кроме …») как путь; пересечение `scope`/`dont_touch` не ловится заранее; тесты/миграции, которые задача неизбежно меняет, не в карточке |
-| `task show` обрезает дополнения | 23 | обрезка 300 символов без `--full` |
-| отчёт ушёл чужой: все пишут в общий `/tmp/r.json` | 16 | `brief` подсказывает `< r.json` без пути; ID в отчёте не сверяется |
-| `lock cpu` уходит в фон, вывод теряется | 12 | `lock` идёт через job/tmux |
-| общая тестовая БД и порты между копиями | 17 | нет ресурсов на задачу |
-| в свежей копии нет `node_modules` | 7 | закрыто в v2: `worktree.link`/`setup` |
-| имена job общие для всех копий | 6 | один каталог job без префикса задачи |
-| `git stash` общий для всех worktree — перепутал правки трёх задач | 6 | только правило, защиты нет |
-| не отличить «было красным» от «сломал я» | 5 | нет прогона на базовой ветке |
-| `merge` без `--into` льёт в main | — | закрыто в v2: цель по умолчанию — ветка модуля, `protect_main` |
+| 0a | English & presentation | Everything in English; `language.text` / `language.commits` chosen at install; README, docs, contributing, security, templates |
+| 1 | Project layer `.dpcli-local/` | Project rules, agent additions (`<agent>.append.md`), own skills and the friction ledger live in the project and survive updates |
+| 2 | Self-improvement | `dpcli feedback` (dedup, clusters, triage project/dpcli, fix/wontfix, regression after fix), `dpcli stats`, `harness-retro` on top of them, `dpcli contribute` (PR from origin or fork, `+1` instead of duplicates, issue fallback) |
+| 3 | Auto-update | `dpcli update [--auto] [--pin vN]` on SessionStart once a day: fast-forward to the latest tag, re-render with the project layer, commit the submodule pointer; report the fate of own PRs (merged / rework / rejected) |
+| 4 | Installer | `curl … install.sh \| bash`: submodule, config (language, worktree setup), `init`, optional modern tools; migrates a vendored copy |
+| 5 | Fast tools | Agents use `rg`, `fd`, `jq`, `ast-grep`, Read with offset; dpcli batches git calls in `status`/`gc` and pre-filters with `rg` |
+| 5b | The hub's CI | `test.yml` (tests, VERSION/CHANGELOG, anonymity, budgets), `review.yml` (AI verdict), `merge.yml` (merge + tag), `nightly.yml` (measure lightness, one shrinking PR) |
+| 6+ | Fixes driven by the ledger | Ordered by frequency of `feedback` issues and their `+1`s |
 
-## Порядок работы в каждой фазе
-Тест, воспроизводящий жалобу → правка → `VERSION` +1 → строка в `CHANGELOG.md`. Перед фазой — сверить кластер с текущим кодом (часть уже закрыта).
+## Known frictions to start with
+From the first production use (one project, ~20 modules, 186 executor reports; a report may count in several rows):
 
-## Ф1. Петля самосовершенствования — основа остального
-- `dpcli feedback [--since] [--module]`: `dp_feedback` отчётов + заметки `harness:` + замечания ревью; склейка дублей, группы по командам dpcli и ключевым словам, частота; статусы `open | fixed vN | wontfix` в `feedback.jsonl` (только дописывается).
-- Метрики: `dur` проверок — в `results.json` (сейчас считается в `run_check` и выбрасывается); `dpcli stats`: длительности проверок, круги доработки (`reviewed rework`), время `created → accepted`.
-- Скилл `harness-retro` — на `feedback`/`stats` (сейчас ищет `search "harness:"` и не видит `dp_feedback` без метки).
-- Агенты: координатор пишет трения меткой `harness:` (не статус), ревьюеру — канал для трений, `dp-status` — период «с последнего события» вместо 30 мин.
-
-## Ф2. Быстрые исправления (~100 жалоб)
-- `task show` — дополнения целиком.
-- `plan <м> <раздел из нескольких слов>`; `plan_ref` проверяется при `task new/set`; «N. Заголовок (ID)» находится по номеру.
-- `report`: путь по умолчанию `<log_dir>/<ID>/report.json`, его называют `brief` и `--template`; сверка `id`.
-- Имена job с префиксом задачи (`$DPCLI_TASK`); `lock` по умолчанию — foreground с выводом в stdout.
-- `accept --only a,b`; `task set scope+=a,b,c` — список; `job start` принимает команду одной строкой.
-
-## Ф3. Приёмка без ожиданий
-- По сохранённым длительностям `accept` сам уходит в фон, если ожидается > ~100 с, и печатает команду ожидания.
-- `--check … --timeout N --order N` в карточке.
-- `accept --baseline`: те же проверки на базовой ветке — новые падения отдельно от старых.
-- Слоты ресурсов на задачу: `{slot}`, `{port}` в `checks.env` (по образцу `lock cpu`).
-
-## Ф4. Карточка, которую нельзя написать плохо
-- `task new/set`: пересечение `scope`/`dont_touch` — ошибка; свободный текст в путях — ошибка; исключения — `!шаблон`.
-- Подсказка: тесты, зависящие от файлов из `scope`.
-- Защита от `git stash` в копиях задач (правило в карточке и workflow; по возможности — проверка).
-
-## Ф5. Экономия токенов
-- Исполнитель читает только нужные разделы workflow.
-- Координатор — на волну: состояние в журнале, следующая волна — свежий координатор.
-- Повторное ревью — только по прошлым замечаниям.
-- Эффект — `skills/harness-retro/cost.py` до и после.
-
-## Критерий готовности фазы
-Тест на каждую закрытую жалобу; после фазы `dpcli feedback` на реальном проекте показывает, что новых жалоб этого кластера нет.
+| Friction | Reports |
+|---|---|
+| `accept --dry` runs 2–15 min in the foreground and hits the agent's tool timeout | 45 |
+| plan section referenced by a card is not found (multi-word section names) | 31 |
+| false `scope` failures (free text in paths, scope/dont_touch overlap, files the task must touch) | 30 |
+| `task show` truncates addenda | 23 |
+| report taken from a shared `/tmp/r.json` written by another agent | 16 |
+| shared test DB / ports between parallel copies | 17 |
+| `lock cpu` goes to background and loses output | 12 |
+| job names shared between copies | 6 |
+| `git stash` is shared by all worktrees | 6 |
+| no baseline: pre-existing failures look like new ones | 5 |

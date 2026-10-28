@@ -1,10 +1,14 @@
-# CHANGELOG
+# Changelog
+
+## 4
+- Everything in English: code, CLI output, agents, templates, docs. `language.text` / `language.commits` in the config choose the language agents write in and the language of commit messages.
+- Repository presentation: CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, issue and PR templates.
 
 ## 3
-- Раскладка: корень репозитория — дистрибутив; установка в проект — сабмодулем `.dpcli` (`worktree.setup` инициализирует его в новых копиях).
-- Модели агентов: координатор и ревьюер — sonnet (opus для ревью сложнейших задач — при запуске).
-- Скилл `harness-retro`: разбор трений процесса и замер расхода токенов (`cost.py`); правки процесса — только с одобрения пользователя.
-- Процесс: сессия на фазу/модуль, главная сессия без опроса по таймеру, трения — одной строкой `harness: …`; подсказка `dp_feedback` в шаблоне отчёта.
+- Layout: the repository root is the distribution; install into a project as the submodule `.dpcli` (`worktree.setup` initializes it in new copies).
+- Agent models: coordinator and reviewer on sonnet (opus for the hardest reviews — at launch).
+- `harness-retro` skill: process friction review and token cost measurement (`cost.py`); process changes only with the user's approval.
+- Process: one session per phase/module, the main session does not poll on a timer, frictions logged as one-line `harness: …`.
 
 ## 2
-- `deliver`, `area`, база модуля, подготовка рабочих копий (`worktree`), `protect_main`, `docs findings`, копии в `~/worktrees`.
+- `deliver`, `area`, module base, worktree copy preparation (`worktree`), `protect_main`, `docs findings`, copies under `~/worktrees`.

@@ -37,7 +37,7 @@ class Pure(unittest.TestCase):
 
 
 class InProject(unittest.TestCase):
-    """Через CLI в временном проекте: приоритет файлов и шаблоны."""
+    """Via the CLI in a temporary project: file precedence and templates."""
 
     def test_json_beats_yml(self):
         p = Project()

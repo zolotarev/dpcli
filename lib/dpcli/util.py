@@ -1,4 +1,4 @@
-"""Общие помощники: ошибки, парсер аргументов, время, JSON/JSONL, короткое форматирование."""
+"""Shared helpers: errors, argument parser, time, JSON/JSONL, short formatting."""
 import argparse
 import datetime as dt
 import json
@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-CLI = ".dpcli/dpcli"  # как вызывать утилиту из корня рабочей копии (в подсказках агентам)
+CLI = ".dpcli/dpcli"  # how to invoke the tool from the copy root (in agent hints)
 
 
 class DpError(Exception):
@@ -24,7 +24,7 @@ class Parser(argparse.ArgumentParser):
 
 
 def subgroup(sp, name, help):
-    """Общая группа подкоманд (`module new` и `module init` регистрируются из разных модулей)."""
+    """Shared subcommand group (`module new` and `module init` register from different modules)."""
     p = sp.choices.get(name)
     if p is None:
         p = sp.add_parser(name, help=help)
@@ -42,7 +42,7 @@ def read_json(p):
     except FileNotFoundError:
         return None
     except json.JSONDecodeError as e:
-        raise DpError(f"{p}: неверный JSON ({e})")
+        raise DpError(f"{p}: invalid JSON ({e})")
 
 
 def write_json(p, obj):
@@ -70,7 +70,7 @@ def read_jsonl(p):
                 try:
                     out.append(json.loads(line))
                 except json.JSONDecodeError:
-                    print(f"dpcli: {p}:{i}: пропущена неверная строка", file=sys.stderr)
+                    print(f"dpcli: {p}:{i}: skipped invalid line", file=sys.stderr)
     except FileNotFoundError:
         pass
     return out
@@ -94,10 +94,10 @@ def age(ts):
     except (TypeError, ValueError):
         return "?"
     if s < 3600:
-        return f"{int(s // 60)}м"
+        return f"{int(s // 60)}m"
     if s < 86400:
-        return f"{int(s // 3600)}ч"
-    return f"{int(s // 86400)}д"
+        return f"{int(s // 3600)}h"
+    return f"{int(s // 86400)}d"
 
 
 def short(s, n):
@@ -114,3 +114,18 @@ def session_line():
     if not v:
         return ""
     return f"Claude-Session: {v if '://' in v else 'https://claude.ai/code/' + v}"
+
+
+def _lang(kind):
+    from . import config
+    return str(config.get(f"language.{kind}", "en") or "en").lower()
+
+
+def lang_text(en, ru):
+    """Text dpcli writes into project files (plans, docs, journal summaries): language.text."""
+    return ru if _lang("text") == "ru" else en
+
+
+def lang_commit(en, ru):
+    """Commit/merge message dpcli writes: language.commits."""
+    return ru if _lang("commits") == "ru" else en

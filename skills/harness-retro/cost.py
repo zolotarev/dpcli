@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Расход токенов по сессиям Claude Code этого проекта: ходы, контекст, главная/субагенты, модели."""
+"""Token usage of this project's Claude Code sessions: turns, context, main vs subagents, models."""
 import argparse
 import json
 import re
@@ -7,14 +7,14 @@ from collections import defaultdict
 from pathlib import Path
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--since", default="", help="YYYY-MM-DD — только ходы не раньше")
-ap.add_argument("--dir", default=str(Path.cwd()), help="корень проекта")
+ap.add_argument("--since", default="", help="YYYY-MM-DD — only turns from this date")
+ap.add_argument("--dir", default=str(Path.cwd()), help="project root")
 a = ap.parse_args()
 
-# ~/.claude/projects/<путь, где / и _ заменены на ->
+# ~/.claude/projects/<path with / _ . replaced by ->
 logs = Path.home() / ".claude" / "projects" / re.sub(r"[/_.]", "-", a.dir)
 if not logs.is_dir():
-    raise SystemExit(f"нет логов: {logs}")
+    raise SystemExit(f"no logs: {logs}")
 
 
 def turns(f):
@@ -45,9 +45,9 @@ for f in sorted(logs.glob("*.jsonl")):
             k[0] += 1; k[1] += ctx; k[2] += out
 
 total = sum(k[1] for k in kinds.values()) or 1
-print("кто/модель                        ходов  ср.контекст  контекст,M  вывод,M  доля")
+print("who/model                        turns  avg.context  context,M  output,M  share")
 for name, (n, ctx, out) in sorted(kinds.items(), key=lambda kv: -kv[1][1]):
     print(f"{name:32} {n:6} {ctx / n / 1e3:10.0f}k {ctx / 1e6:11.0f} {out / 1e6:8.1f} {ctx / total:5.0%}")
-print("\nглавные сессии                   ходов  ср.контекст  макс  контекст,M  период")
+print("\nmain sessions                    turns  avg.context   max  context,M  period")
 for s, n, avg, mx, tot, t0, t1 in sorted(sess, key=lambda x: -x[4]):
     print(f"{s:32} {n:6} {avg / 1e3:10.0f}k {mx / 1e3:5.0f}k {tot / 1e6:11.0f}  {t0}..{t1}")
