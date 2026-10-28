@@ -56,6 +56,21 @@ def lang_name(code):
     return LANG_NAMES.get(c.lower(), c)
 
 
+LOCAL_README = """# Project layer for dpcli
+
+Committed with the project; `dpcli init` renders it on top of the dpcli distribution (`.dpcli`), so updates of dpcli never overwrite it.
+
+- `agents/<name>.append.md` — appended to the dpcli agent `<name>` (preferred: the agent keeps receiving updates).
+- `agents/<name>.md` — your own agent, or a full replacement of a dpcli agent with that name.
+- `skills/<name>/` — project skills; a skill with a dpcli skill's name replaces it.
+- `workflow.md` — project rules, appended to the process description as "Project rules".
+- `claude-md.md` — lines appended to the dpcli block in `CLAUDE.md`.
+- `feedback.jsonl` — friction ledger (`dpcli feedback`).
+
+After editing: `.dpcli/dpcli init`, then commit this directory and `.claude/`.
+"""
+
+
 class Init:
     def __init__(self, a):
         self.a = a
@@ -64,6 +79,7 @@ class Init:
         self.warn = []
         self.dry = a.dry_run or a.check
         self.cli = relp(DIST / "dpcli", self.root)
+        self.local = config.repo_path(config.get("local_dir", ".dpcli-local"), root=self.root)
 
     # ---------- output ----------
     def row(self, path, status, note=""):
@@ -126,6 +142,9 @@ class Init:
         files = sorted(d.glob("*.md")) if d.is_dir() else []
         if not files:
             raise DpError(f"no agent definitions in {src_rel}/*.md")
+        ld = self.local / "agents"
+        own = [f for f in sorted(ld.glob("*.md")) if not f.name.endswith(".append.md")] if ld.is_dir() else []
+        files = [f for f in files if f.name not in {o.name for o in own}] + own
         errors, names, roles = [], {}, set()
         out = []
         for f in files:
@@ -151,7 +170,10 @@ class Init:
                 continue
             names[name] = fr
             roles.add(role)
-            out.append((f".claude/agents/{name}.md", text.encode(), f, src_rel))
+            app = ld / f"{name}.append.md"
+            if app.is_file():  # project addition to an agent: the distribution body keeps updating
+                text = text.rstrip("\n") + "\n\n" + self.render(app.read_text(encoding="utf-8"), relp(app, self.root)).strip() + "\n"
+            out.append((f".claude/agents/{name}.md", text.encode(), f, relp(f.parent, self.root)))
         if errors:
             raise DpError("errors in agent definitions:\n  " + "\n  ".join(errors))
         for r in ("executor", "reviewer"):
@@ -160,10 +182,17 @@ class Init:
         return out
 
     def plan_skills(self):
-        d = DIST / "skills"
+        out = []
+        local = self.local / "skills"
+        mine = {x.name for x in local.iterdir() if x.is_dir()} if local.is_dir() else set()
+        for d in (DIST / "skills", local):
+            out += self._skill_files(d, skip=mine if d != local else set())
+        return out
+
+    def _skill_files(self, d, skip):
         out = []
         for f in sorted(d.rglob("*")) if d.is_dir() else []:
-            if not f.is_file() or "__pycache__" in f.parts:
+            if not f.is_file() or "__pycache__" in f.parts or f.relative_to(d).parts[0] in skip:
                 continue
             b = f.read_bytes()
             try:
@@ -178,8 +207,24 @@ class Init:
         if not f.is_file():
             raise DpError(f"no workflow template {relp(f, self.root)}")
         dest = relp(config.repo_path(config.get("workflow"), root=self.root), self.root)
-        return [(dest, self.render(f.read_text(encoding="utf-8"), relp(f, self.root)).encode(), f,
-                 relp(f, self.root))]
+        text = self.render(f.read_text(encoding="utf-8"), relp(f, self.root)).rstrip("\n") + "\n"
+        rules = self.local_text("workflow.md")
+        if rules:
+            text += f"\n## Project rules\n\nFrom `{relp(self.local, self.root)}/workflow.md`.\n\n{rules}\n"
+        return [(dest, text.encode(), f, relp(f, self.root))]
+
+    def local_text(self, name):
+        f = self.local / name
+        return self.render(f.read_text(encoding="utf-8"), relp(f, self.root)).strip() if f.is_file() else ""
+
+    def local_readme(self):
+        p = self.local / "README.md"
+        if p.exists():
+            return
+        self.row(relp(p, self.root), "created", "project layer")
+        if not self.dry:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(LOCAL_README, encoding="utf-8")
 
     # ---------- writing with manifest ----------
     def sync_generated(self, plan):
@@ -279,7 +324,9 @@ class Init:
 
     def claude_md(self):
         f = DIST / "templates" / "claude-md.md"
-        block = f"{BEGIN}\n{self.render(f.read_text(encoding='utf-8'), relp(f, self.root)).strip()}\n{END}"
+        body = self.render(f.read_text(encoding='utf-8'), relp(f, self.root)).strip()
+        extra = self.local_text("claude-md.md")
+        block = f"{BEGIN}\n{body}" + (f"\n{extra}" if extra else "") + f"\n{END}"
         p = self.root / "CLAUDE.md"
         old = p.read_text(encoding="utf-8") if p.is_file() else None
         if old is None:
@@ -334,6 +381,7 @@ class Init:
         self.vals = self.values()
         plan = self.plan_agents() + self.plan_skills() + self.plan_workflow()
         self.sync_generated(plan)
+        self.local_readme()
         self.claude_md()
         self.settings()
         self.gitignore()

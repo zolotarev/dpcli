@@ -57,6 +57,8 @@ DEFAULTS = {
     "workflow": ".claude/dpcli-workflow.md",
     # language of text agents write for people (replies, reports, journal, plans, docs) and of commit messages
     "language": {"text": "en", "commits": "en"},
+    # project layer: project rules, agent additions, own skills, friction ledger — committed with the project
+    "local_dir": ".dpcli-local",
     # preparing new copies (module new, task new, copy setup) — see copies.py
     "worktree": {
         "hooks": True,  # also copy a relative core.hooksPath (e.g. .husky/_) from the main copy

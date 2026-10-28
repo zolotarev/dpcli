@@ -91,6 +91,13 @@ def load_agents():
         meta = _read(f)
         if meta is not None:
             out[str(meta.get("name") or f.stem)] = _entry(meta, f, "dpcli")
+    try:
+        ld = config.repo_path(config.get("local_dir", ".dpcli-local")) / "agents"
+    except DpError:
+        ld = None
+    for f in sorted(ld.glob("*.md")) if ld and ld.is_dir() else []:
+        if not f.name.endswith(".append.md") and (meta := _read(f)) is not None:
+            out[str(meta.get("name") or f.stem)] = _entry(meta, f, "local")
     for f in _project_files():
         meta = _read(f)
         if meta is None:

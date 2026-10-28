@@ -12,5 +12,5 @@ Cheap: one session, no subagents, only the commands below. Don't read project co
 3. **Cost.** `python3 .claude/skills/harness-retro/cost.py --since <YYYY-MM-DD>`: sessions, turns, average and max context, main/subagent share, models. Alarming: main session average context > 200k, a session longer than a phase, Opus on agents outside the models table.
 4. **Group.** Recurring (≥ 2 times) or expensive (cost, rework rounds). One-offs — skip.
 5. **Propose to the user** as one list, ≤ 3 items: `what hurt (refs: ID/module) → change (file) → gain/cost`. Change nothing without approval.
-6. **Apply the approved** in the source: `.dpcli/templates/workflow.md`, `.dpcli/templates/claude-md.md`, `.dpcli/agents/*.md`, `.dpcli/skills/**`; a change to dpcli itself is a task in a module, not here. Then `{{cli}} init`, `git diff --stat`, commit only these files and `.claude/`, `CLAUDE.md`.
+6. **Apply the approved.** Project-specific — in `.dpcli-local/` (`workflow.md`, `claude-md.md`, `agents/<name>.append.md`, `skills/`), then `{{cli}} init`, commit `.dpcli-local/`, `.claude/`, `CLAUDE.md`. A change to dpcli itself — never edit `.dpcli/` in place: a PR to the dpcli repository.
 7. **Record.** Each decision — `{{cli}} decide harness "<change>" --by user --why "<friction>"`; summary — `{{cli}} event harness note --note "retro: <date>; accepted N, rejected M"`.

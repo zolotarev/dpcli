@@ -53,6 +53,21 @@ Exact flags: `.dpcli/dpcli init -h`.
 
 After `init`, commit the result (only the main session commits).
 
+## Project layer
+
+`.dpcli-local/` (config key `local_dir`) is committed with the project and rendered by `init` on top of the distribution, so updating `.dpcli` never overwrites project changes:
+
+| Path | Effect |
+|---|---|
+| `agents/<name>.append.md` | appended to the dpcli agent `<name>` — preferred, the agent keeps receiving updates |
+| `agents/<name>.md` | an own agent, or a full replacement of the dpcli agent with that name (listed by `dpcli agents` as source `local`) |
+| `skills/<name>/` | a project skill; replaces a dpcli skill with the same name |
+| `workflow.md` | appended to the process description as "Project rules" |
+| `claude-md.md` | appended to the dpcli block in `CLAUDE.md` |
+| `feedback.jsonl` | friction ledger |
+
+`init` creates `.dpcli-local/README.md` once.
+
 ## Config
 
 `dpcli.json` or `dpcli.yml`/`dpcli.yaml` at the project root (searched upward from the current directory to the git root; json wins if both exist). All keys are optional. Full list with comments and defaults — [`dpcli.example.yml`](../dpcli.example.yml). In brief:

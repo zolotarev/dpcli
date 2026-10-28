@@ -108,7 +108,8 @@ Opus only if the task needs design that cannot be moved into the plan or a contr
 
 ## Agent setup
 - dpcli agents — `.dpcli/agents/*.md` (Claude Code format + `dpcli_role: coordinator|executor|reviewer|status`, `dpcli_review: true|false`); `{{cli}} init` puts them into `.claude/agents/`.
-- `init` does not touch project agents: same-named files in `.claude/agents/` are skipped.
+- Project changes live in the project layer `.dpcli-local/` (see its README), never in `.dpcli/` — the distribution is replaced on update: `agents/<name>.append.md` adds to a dpcli agent, `agents/<name>.md` is an own agent, `skills/<name>/`, `workflow.md` (project rules), `claude-md.md`. Then `{{cli}} init`.
+- `init` does not touch files it did not create: same-named files in `.claude/agents/` are skipped.
 - Attach your own agent to a role — `roles` in `dpcli.yml` (`name: {role: executor, review: true}`) or `dpcli_role` in its frontmatter; then it is valid in `task new --type`.
 - Role registry — `{{cli}} agents`.
 
@@ -125,5 +126,5 @@ Every turn pays for the whole session context again: a short answer at 500k cont
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
 - **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`. No status here.
-- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request. Result — ≤ 3 proposals to the user with cost and gain; approved changes go to the source (`.dpcli/templates/`, `.dpcli/agents/`, `.dpcli/skills/`) → `{{cli}} init` → commit; decision — `{{cli}} decide harness …`.
+- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request. Result — ≤ 3 proposals to the user with cost and gain; approved project changes go to `.dpcli-local/` → `{{cli}} init` → commit; changes to dpcli itself — a PR to the dpcli repository; decision — `{{cli}} decide harness …`.
 - The user's remarks about the work — into memory (feedback) at once, without waiting for a review.
