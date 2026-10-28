@@ -8,6 +8,8 @@ import subprocess
 import sys
 import time
 
+REVIEWERS = {"github-actions", "github-actions[bot]", "app/github-actions"}
+
 
 def gh(*a, check=True):
     r = subprocess.run(["gh", *a], capture_output=True, text=True)
@@ -52,7 +54,9 @@ def release():
 
 def main(pr):
     comments = json.loads(gh("pr", "view", pr, "--json", "comments"))["comments"]
-    body = next((c["body"] for c in reversed(comments) if re.search(r"^VERDICT:", c["body"], re.M)), "")
+    # only the reviewer's own comments count: anyone (the PR author too) can write "VERDICT: accept"
+    body = next((c["body"] for c in reversed(comments) if (c.get("author") or {}).get("login") in REVIEWERS
+                 and re.search(r"^VERDICT:", c["body"], re.M)), "")
     m = re.search(r"^VERDICT:\s*(accept|rework|reject)\b", body, re.M | re.I)
     verdict = m[1].lower() if m else "rework"
     if verdict == "reject":
