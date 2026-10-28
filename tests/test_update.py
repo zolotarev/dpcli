@@ -52,6 +52,8 @@ class Update(unittest.TestCase):
     def release(self, n, agent_text="RELEASED"):
         f = self.src / "agents" / "dp-engineer.md"
         f.write_text(f.read_text().replace("You are a", f"{agent_text}: you are a", 1))
+        w = self.src / "templates" / "workflow.md"
+        w.write_text(w.read_text() + f"\n<!-- {agent_text} -->\n")
         v = self.src / "lib/dpcli/__init__.py"
         v.write_text(re.sub(r"VERSION = \d+", f"VERSION = {n}", v.read_text()))
         c = self.src / "CHANGELOG.md"
