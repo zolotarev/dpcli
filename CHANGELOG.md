@@ -1,5 +1,10 @@
 # Changelog
 
+## 7
+- `dpcli update [--auto] [--check] [--pin vN|--unpin] [--prs-only]`: moves the `.dpcli` submodule to the latest release tag, re-runs `init` with the project layer, commits the pointer and generated files, prints the new CHANGELOG lines; skips when `.dpcli` is dirty, on `improve/*`, has local commits, or offline.
+- Checks own PRs/issues at the hub: merged → fixed; rework/rejected → reviewer arguments into the ledger.
+- `init` adds the `SessionStart` hook `update --auto` (once a day).
+
 ## 6
 - `dpcli feedback`: friction ledger from `dp_feedback`, `harness:` notes and review `harness`; dedup, clusters by topic, `new --match --scope project|dpcli`, `fix`, `wontfix`, `reopen`, `⚠N after fix` when a fixed friction comes back. Ledger in `.dpcli-local/feedback.jsonl`.
 - `dpcli stats`: tasks, created→accepted, rework rounds, frictions per module; check durations (median/max) — `accept` now stores them.

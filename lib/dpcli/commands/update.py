@@ -1,0 +1,146 @@
+"""update: move the .dpcli submodule to the latest release tag, re-render with the project layer, commit the pointer;
+report what happened to this project's PRs/issues at the dpcli hub."""
+import datetime as dt
+import json
+import re
+import shutil
+import subprocess
+import sys
+
+from .. import VERSION, config, gitx, reexec
+from ..util import CLI, append_jsonl, lang_commit, now, read_json, short, write_json
+from .feedback import ledger, ledger_path
+
+GENERATED = [".dpcli", ".claude/agents", ".claude/skills", ".claude/.dpcli-manifest.json", ".claude/settings.json", "CLAUDE.md"]
+
+
+def run(*cmd, cwd=None, timeout=60):
+    try:
+        return subprocess.run(list(cmd), cwd=cwd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, 124, "", "timeout")
+
+
+def pin_file():
+    return config.repo_path(config.get("local_dir", ".dpcli-local")) / "update.json"
+
+
+def stamp_file():
+    return config.expand("~/.cache/dpcli/{project}/update.stamp")
+
+
+def tag_num(t):
+    m = re.fullmatch(r"v(\d+)", t)
+    return int(m[1]) if m else None
+
+
+def changelog(dist, ref, lo, hi):
+    """First line of each CHANGELOG section lo < N ≤ hi at ref."""
+    text = run("git", "show", f"{ref}:CHANGELOG.md", cwd=dist).stdout
+    out = []
+    for m in re.finditer(r"^## (\d+)[^\n]*\n+- ([^\n]+)", text, re.M):
+        if lo < int(m[1]) <= hi:
+            out.append(f"v{m[1]}: {short(m[2], 100)}")
+    return out
+
+
+def cmd_update(a):
+    if a.pin or a.unpin:
+        write_json(pin_file(), {"pin": a.pin} if a.pin else {})
+        print(f"dpcli pinned to {a.pin}" if a.pin else "dpcli unpinned")
+        return
+    if a.auto:
+        st = stamp_file()
+        today = dt.date.today().isoformat()
+        if st.is_file() and st.read_text().strip() == today:
+            return
+        st.parent.mkdir(parents=True, exist_ok=True)
+        st.write_text(today + "\n")
+    lines = []
+    if not a.prs_only:
+        lines += update_dist(a)
+    lines += check_prs()
+    if lines:
+        print("\n".join(lines))
+
+
+def update_dist(a):
+    root, mw = gitx.toplevel(), gitx.main_worktree()
+    if mw and root.resolve() != mw.resolve():
+        return [] if a.auto else ["update: only in the main copy (task copies re-exec it)"]
+    dist = reexec.DIST_DIR
+    if run("git", "rev-parse", "--show-toplevel", cwd=dist).stdout.strip() != str(dist):
+        return ["update: .dpcli is not a git submodule — reinstall with install.sh"]
+    if run("git", "status", "--porcelain", cwd=dist).stdout.strip():
+        return ["update: skipped — uncommitted changes in .dpcli (commit them on improve/* or revert)"]
+    br = run("git", "branch", "--show-current", cwd=dist).stdout.strip()
+    if br and br != "main":
+        return [f"update: skipped — .dpcli is on {br} (finish it: {CLI} contribute)"]
+    if run("git", "fetch", "-q", "--tags", "origin", cwd=dist, timeout=15).returncode:
+        return ["update: offline, skipped"]
+    if br == "main" and run("git", "log", "--oneline", "origin/main..HEAD", cwd=dist).stdout.strip():
+        return ["update: skipped — local commits on .dpcli main: move them to improve/* and contribute"]
+    tags = sorted(n for n in map(tag_num, run("git", "tag", "-l", "v*", cwd=dist).stdout.split()) if n)
+    pin = tag_num((read_json(pin_file()) or {}).get("pin") or "")
+    cand = [n for n in tags if pin is None or n <= pin]
+    if not cand or cand[-1] <= VERSION:
+        return [f"dpcli v{VERSION} is up to date" + (f" (pinned v{pin})" if pin else "")] if not a.auto else []
+    target = cand[-1]
+    if a.check:
+        return [f"dpcli v{VERSION} → v{target} available: {CLI} update"]
+    r = run("git", "checkout", "-q", f"v{target}", cwd=dist)
+    if r.returncode:
+        return [f"update: checkout v{target} failed: {r.stderr.strip()}"]
+    r = run(sys.executable, str(reexec.entry()), "init", cwd=root)
+    if r.returncode:
+        return [f"update: v{target} checked out, but init failed — fix and run {CLI} init: {short(r.stderr.strip(), 200)}"]
+    paths = [p for p in GENERATED if (root / p).exists()]
+    h = ""
+    if run("git", "status", "--porcelain", "--", *paths, cwd=root).stdout.strip():
+        h = gitx.commit_paths(root, paths, lang_commit(f"dpcli v{target}", f"dpcli v{target}"))
+    notes = changelog(dist, f"v{target}", VERSION, target)
+    return [f"dpcli v{VERSION} → v{target}" + (f", committed {h}" if h else "")] + [f"  {x}" for x in notes]
+
+
+def check_prs():
+    """Fate of open PRs/issues sent by `contribute`: merged → fixed; rework/rejected → arguments into the ledger."""
+    led = ledger()
+    todo = {fid: c for fid, c in led.items() if c.get("pr") and c["status"] in ("open", "rework")}
+    if not todo or not shutil.which("gh") or run("gh", "auth", "status").returncode:
+        return []
+    out = []
+    for fid, c in todo.items():
+        url = c["pr"]
+        kind = "pr" if "/pull/" in url else "issue"
+        r = run("gh", kind, "view", url, "--json", "state,labels,comments", timeout=20)
+        try:
+            info = json.loads(r.stdout)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        state = str(info.get("state", "")).upper()
+        labels = {x.get("name") for x in info.get("labels") or []}
+        verdict = next((x.get("body", "") for x in reversed(info.get("comments") or []) if "VERDICT:" in x.get("body", "")), "")
+        why = short(" ".join(l.strip("- ") for l in verdict.splitlines()[1:] if l.strip()), 200)
+        tag = url.rstrip("/").rsplit("/", 2)[-2] + "/" + url.rstrip("/").rsplit("/", 1)[-1]
+        if state == "MERGED" or (kind == "issue" and state == "CLOSED" and "rejected" not in labels):
+            append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "fix", "where": f"dpcli (merged {url})", "pr": url})
+            out.append(f"{tag} merged → {fid} fixed (remove temporary workarounds marked until: {url})")
+        elif state == "CLOSED" or "rejected" in labels:
+            append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "rejected", "why": why})
+            out.append(f"{tag} rejected → {fid}: {why or 'see the PR'} — drop it or solve in .dpcli-local/ (harness-retro)")
+        elif "rework" in labels and c["status"] != "rework":
+            append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "rework", "why": why})
+            out.append(f"{tag} rework → {fid}: {why or 'see the review'} — rework on its improve/* branch or drop (harness-retro)")
+    return out
+
+
+def register(sp):
+    q = sp.add_parser("update", help="update the .dpcli submodule to the latest release, re-render, commit; check own PRs")
+    q.add_argument("--auto", action="store_true", help="at most once a day, silent when nothing happened (SessionStart hook)")
+    q.add_argument("--check", action="store_true", help="only tell whether a new version is available")
+    q.add_argument("--prs-only", dest="prs_only", action="store_true", help="only check own PRs/issues at the hub")
+    g = q.add_mutually_exclusive_group()
+    g.add_argument("--pin", metavar="vN", help="never update above vN (stored in .dpcli-local/update.json)")
+    g.add_argument("--unpin", action="store_true")
+    q.set_defaults(func=cmd_update)
+

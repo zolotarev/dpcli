@@ -352,11 +352,18 @@ class Init:
             raise DpError(".claude/settings.json: object expected")
         perm = f"Bash({self.cli} *)"
         allow = data.setdefault("permissions", {}).setdefault("allow", [])
-        if perm in allow:
+        hook = f"{self.cli} update --auto"
+        starts = data.setdefault("hooks", {}).setdefault("SessionStart", [])
+        has_hook = any(hook in str(h.get("command", "")) for e in starts if isinstance(e, dict) for h in e.get("hooks") or [])
+        add = ([perm] if perm not in allow else []) + ([] if has_hook else ["SessionStart: update --auto"])
+        if not add:
             self.row(".claude/settings.json", "unchanged", perm)
             return
-        allow.append(perm)
-        self.put_text(".claude/settings.json", old, json.dumps(data, ensure_ascii=False, indent=2) + "\n", perm)
+        if perm not in allow:
+            allow.append(perm)
+        if not has_hook:
+            starts.append({"hooks": [{"type": "command", "command": hook}]})
+        self.put_text(".claude/settings.json", old, json.dumps(data, ensure_ascii=False, indent=2) + "\n", ", ".join(add))
 
     def gitignore(self):
         want = [".read_*"]

@@ -126,3 +126,14 @@ class LocalLayer(unittest.TestCase):
         readme.write_text("mine\n")
         self.p.ok("init")
         self.assertEqual(readme.read_text(), "mine\n")
+
+
+class Hook(unittest.TestCase):
+    def test_session_start_update_hook_added_once(self):
+        p = Project()
+        self.addCleanup(p.cleanup)
+        p.ok("init")
+        p.ok("init")
+        st = json.loads((p.root / ".claude" / "settings.json").read_text())
+        cmds = [h["command"] for e in st["hooks"]["SessionStart"] for h in e["hooks"]]
+        self.assertEqual(sum("update --auto" in c for c in cmds), 1)

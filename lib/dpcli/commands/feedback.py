@@ -56,6 +56,8 @@ def ledger():
                 c.update(status="fixed", t_fix=r["t"], where=r.get("where", ""), pr=r.get("pr", c.get("pr", "")))
             elif kind == "wontfix":
                 c.update(status="wontfix", why=r.get("why", c.get("why", "")))
+            elif kind in ("rework", "rejected"):
+                c.update(status=kind, why=r.get("why", c.get("why", "")))
             elif kind == "reopen":
                 c.update(status="open", t_fix="")
             elif kind in ("pr", "issue"):
@@ -128,7 +130,7 @@ def cmd_feedback(a):
         return
     print(f"frictions {len(its)}, unique {len(uniq(its))}" + (f" since {a.since}" if a.since else ""))
     for fid, c in sorted(led.items(), key=lambda kv: int(kv[0][2:]) if kv[0][2:].isdigit() else 0):
-        if c["status"] != "open" and not a.all and c["status"] != "fixed":
+        if c["status"] == "wontfix" and not a.all:
             continue
         g = by_c.get(fid, [])
         after = [i for i in g if c.get("t_fix") and i["t"] > c["t_fix"]]
