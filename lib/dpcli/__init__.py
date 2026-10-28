@@ -6,4 +6,4 @@ The module journal lives in the module-branch copy (module_branch) if there is o
 else in the current copy. Exit codes: 0 ok, 1 error/check failed, 2 arguments.
 """
 
-VERSION = 8  # bump on every change: older copies re-exec from the main copy (reexec.maybe_reexec)
+VERSION = 9  # bump on every change: older copies re-exec from the main copy (reexec.maybe_reexec)

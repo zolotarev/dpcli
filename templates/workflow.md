@@ -71,6 +71,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Correctness over "looks nice": parameters are justified (domain, measurements, sources); assumptions and limits go into the report.
 - Don't invent: numbers come from measurements, results from reports.
 - Don't polish: minor visual/style details — at most 2 attempts.
+- Fast tools: search — `rg`; files — `fd` or `rg --files`; JSON — `jq`; code structure — `ast-grep`; read a file with the Read tool (offset/limit), not `cat`/`sed -n`; Python beyond one line — a script file run with `uv run` or `python3 file.py`, not a long `python3 -` heredoc.
 - Tests — non-interactive. GPU — `{{cli}} lock gpu <name> -- <cmd>`, heavy CPU — `{{cli}} lock cpu …`.
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
 - Batches of runs — one script, one background run, results as a table; not a "run → look" loop.

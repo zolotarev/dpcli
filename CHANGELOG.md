@@ -1,5 +1,10 @@
 # Changelog
 
+## 9
+- `gc`: one `git status --ignored` per copy per run instead of one per (branch × copy) — 25 merged copies: 6.6 s → 0.9 s. Removed copies no longer block neighbours.
+- Process rule: fast tools for agents (`rg`, `fd`, `jq`, `ast-grep`, Read with offset instead of `cat`/`sed -n`, scripts instead of long heredocs); `install.sh --tools` installs them.
+- Measured on a real project and left as is (≤ 0.6 s): `status`, `status --since`, `search`, `docs find`, `docs check`, `feedback`.
+
 ## 8
 - `install.sh`: installs or updates dpcli in an existing project (`curl … | bash`): submodule at the latest release, `language` (asked or `--lang` / `--commit-lang`), `worktree.setup`, `init`; migrates a vendored copy (own agents → `.dpcli-local/agents/`); `--tools` installs `rg`, `fd`, `jq`, `ast-grep`. Idempotent, never commits.
 

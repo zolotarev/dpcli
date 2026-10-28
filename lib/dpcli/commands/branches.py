@@ -1,5 +1,6 @@
 """module new, sync, merge, gc: branches and copies."""
 import fnmatch
+import functools
 import subprocess
 from pathlib import Path
 
@@ -137,22 +138,23 @@ def gc_live_reason(b, merged, mods):
 def gc_symlink_reason(path, wt_paths):
     """Symlinks from other copies into path (e.g. .venv): removing the copy would break them."""
     root = Path(path).resolve()
-    hits = []
-    for other in wt_paths:
-        if Path(other).resolve() == root:
-            continue
-        for xy, name in gitx.status_entries(other, "--ignored"):
-            if xy not in ("??", "!!"):
-                continue
-            f = Path(other) / name.rstrip("/")
-            if f.is_symlink():
-                try:
-                    tgt = f.resolve()
-                except OSError:
-                    continue
-                if tgt == root or root in tgt.parents:
-                    hits.append(f"{pretty(f)} → {pretty(tgt)}")
+    hits = [f"{pretty(f)} → {pretty(tgt)}" for other in wt_paths if Path(other).resolve() != root and Path(other).is_dir()  # removed earlier in this run
+            for f, tgt in _symlinks(str(other)) if tgt == root or root in tgt.parents]
     return f"symlinks from other copies point into it ({'; '.join(hits[:2])})" if hits else None
+
+
+@functools.lru_cache(maxsize=None)
+def _symlinks(copy):
+    """Untracked/ignored symlinks of a copy → [(link, target)]; one git status per copy per run (gc was O(n²))."""
+    out = []
+    for xy, name in gitx.status_entries(copy, "--ignored"):
+        f = Path(copy) / name.rstrip("/")
+        if xy in ("??", "!!") and f.is_symlink():
+            try:
+                out.append((f, f.resolve()))
+            except OSError:
+                continue
+    return out
 
 
 def ignored_dirs(path):
