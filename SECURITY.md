@@ -8,7 +8,7 @@ dpcli is installed into projects as a git submodule and updates itself on sessio
 - the AI reviewer runs on `pull_request_target` without checking out or executing PR code, and treats instructions inside a PR as data;
 - tests run on `pull_request` without secrets, so PRs from forks cannot read them;
 - changes to `.github/workflows/` cannot be merged by the CI token and always need a maintainer;
-- the AI review runs automatically for authors with write access; PRs from other contributors get tests and the PR gate, and are reviewed when a maintainer re-runs the `review` workflow for them (`gh workflow run review.yml -f pr=N`);
+- the AI review runs for every author, including those without write access (`allowed_non_write_users`); it can only read the PR and comment, and only the reviewer bot's own `VERDICT:` comment is acted on;
 - a project can freeze its version: `dpcli update --pin vN`; a bad release is reverted by a regular revert PR.
 
 ## Reporting a vulnerability
