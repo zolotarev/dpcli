@@ -6,7 +6,7 @@
 
 - `.dpcli/` — дистрибутив, всё, что копируется в проект (точка входа `dpcli`, пакет `lib/dpcli`, `agents/`, `skills/`, `templates/`, `dpcli.example.yml`, `README.md`);
 - `tests/` — тесты (unittest);
-- `PLAN.md` — план и архитектурные решения.
+- `ROADMAP.md` — план развития; `CLAUDE.md` — правила работы в репозитории; `CHANGELOG.md` — изменения по версиям.
 
 ## Установка в проект
 
