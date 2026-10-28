@@ -1,14 +1,14 @@
 # dpcli — правила работы в репозитории
 
-Переносимая утилита процесса для проектов с агентами Claude Code. Справка по самой утилите — [.dpcli/README.md](.dpcli/README.md), план развития — [ROADMAP.md](ROADMAP.md).
+Переносимая утилита процесса для проектов с агентами Claude Code. Справка по утилите — [README.md](README.md), план развития — [ROADMAP.md](ROADMAP.md).
 
 ## Раскладка
-- `.dpcli/` — дистрибутив, копируется в проект целиком: точка входа `dpcli`, пакет `lib/dpcli` (команды — `commands/*.py`, каждый модуль экспортирует `register(sp)`), `agents/`, `skills/`, `templates/`, `dpcli.example.yml`.
-- `tests/` — unittest; общая фикстура `tests/helpers.py` (`Project` — временный git-проект с копией `.dpcli`).
+- Корень репозитория — дистрибутив; в проекте он сабмодуль `.dpcli` (так его и проверять: `cd <проект> && .dpcli/dpcli …`). Точка входа `dpcli`, пакет `lib/dpcli` (команды — `commands/*.py`, каждый модуль экспортирует `register(sp)`), `agents/`, `skills/`, `templates/`, `dpcli.example.yml`.
+- `tests/` — unittest; общая фикстура `tests/helpers.py` (`Project` — временный git-проект с копией дистрибутива в `.dpcli`).
 
 ## Правила
 - Только стандартная библиотека Python ≥ 3.10 и git; внешних зависимостей не добавлять (Ollama для `search --sem` — опционально).
-- Любая правка в `.dpcli/` → поднять `VERSION` в `.dpcli/lib/dpcli/__init__.py` (старые копии перезапускаются из главной по ней, `reexec.py`) и строка в `CHANGELOG.md`.
+- Любая правка дистрибутива → поднять `VERSION` в `lib/dpcli/__init__.py` (старые копии перезапускаются из главной по ней, `reexec.py`) и строка в `CHANGELOG.md`.
 - Исправление жалобы — сначала тест, который её воспроизводит, потом правка.
 - Перед коммитом — `python3 -m unittest discover -s tests` (≈ 1 мин), все зелёные.
 - Требования — из отзывов агентов (`dp_feedback`, заметки `harness:`) в проектах, где dpcli работает; без данных — не выдумывать фичи.

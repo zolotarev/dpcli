@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-DIST = REPO / ".dpcli"
+DIST = REPO  # корень репозитория — сам дистрибутив (в проекте — сабмодуль .dpcli)
 LIB = DIST / "lib"
 
 
@@ -34,7 +34,7 @@ class Project:
         git("config", "user.name", "Test", cwd=self.root)
         git("config", "user.email", "test@example.com", cwd=self.root)
         git("config", "commit.gpgsign", "false", cwd=self.root)
-        shutil.copytree(DIST, self.root / ".dpcli", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(DIST, self.root / ".dpcli", ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git", "tests", ".pytest_cache"))
         cfg = {
             "project": "proj",
             "copies_dir": str(self.copies),

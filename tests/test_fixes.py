@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".dpcli" / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 
 from dpcli import config, copies, gitx  # noqa: E402
 from dpcli.commands import accept, branches, docs, task  # noqa: E402
