@@ -26,15 +26,17 @@ def label(pr, add, remove=()):
 
 
 def tests_state(pr, timeout=1800):
-    """success | failure | missing, waiting for the `test` workflow on the PR head."""
+    """success | failure | missing: latest `test` run on the PR head commit, whatever started it
+    (pull_request, or workflow_dispatch for PRs opened by workflows — those are not PR checks)."""
+    sha = json.loads(gh("pr", "view", pr, "--json", "headRefOid"))["headRefOid"]
     t0 = time.time()
     while True:
-        checks = json.loads(gh("pr", "checks", pr, "--json", "name,state,workflow", check=False) or "[]")
-        mine = [c for c in checks if c.get("workflow") == "test"]
-        if mine and all(c["state"] not in ("PENDING", "QUEUED", "IN_PROGRESS") for c in mine):
-            return "success" if all(c["state"] in ("SUCCESS", "SKIPPED", "NEUTRAL") for c in mine) else "failure"
+        runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json", "status,conclusion",
+                             check=False) or "[]")
+        if runs and runs[0]["status"] == "completed":
+            return "success" if runs[0]["conclusion"] == "success" else "failure"
         if time.time() - t0 > timeout:
-            return "missing" if not mine else "failure"
+            return "missing" if not runs else "failure"
         time.sleep(30)
 
 
