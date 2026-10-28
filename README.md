@@ -41,7 +41,7 @@ Multi-agent coding falls apart in predictable ways: agents retell each other's c
 | Agents trample each other | One git worktree and branch per task; locks for CPU/GPU-heavy runs |
 | Same frictions every week | Agents log frictions as they work; dpcli clusters them, fixes ship as PRs to this repo, every project gets them on update |
 
-> **Status:** the core (journal, cards, acceptance, worktrees, delivery) is in production use. The installer, `feedback`, `contribute`, `update` and the hub CI are being built now — see [ROADMAP.md](ROADMAP.md). Until the installer lands, install manually as described in [docs/guide.md](docs/guide.md#installation).
+> **Status:** the core (journal, cards, acceptance, worktrees, delivery), the installer, the friction ledger (`feedback`, `stats`, `contribute`) and auto-update are released. The hub CI (automatic review and merge, nightly simplification) is being built — see [ROADMAP.md](ROADMAP.md).
 
 ## Quick start
 
@@ -49,6 +49,7 @@ In the root of an existing git project:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zolotarev/dpcli/main/install.sh | bash
+# options: --lang ru --commit-lang en --tools (install rg, fd, jq, ast-grep) --yes
 ```
 
 The installer adds dpcli as the git submodule `.dpcli`, asks which language agents should write in (and, separately, commit messages), creates `dpcli.yml`, and runs `.dpcli/dpcli init` — agents, skills and the process description land in `.claude/`. Commit the result, then in Claude Code:

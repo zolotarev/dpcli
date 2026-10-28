@@ -12,6 +12,25 @@ Exit codes: 0 — ok, 1 — error or FAIL, 2 — invalid arguments. An error is 
 
 ## Installation
 
+Recommended — the installer, in the root of the project:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zolotarev/dpcli/main/install.sh | bash
+# or, with dpcli already present: bash .dpcli/install.sh
+```
+
+| Option | |
+|---|---|
+| `--lang CODE` | language agents write in for people (asked if omitted; default `en`) |
+| `--commit-lang CODE` | language of commit messages (asked if omitted; default `en`) |
+| `--tools` | install missing fast tools for agents: `rg`, `fd`, `jq`, `ast-grep` |
+| `--yes` | no questions, defaults |
+| `DPCLI_REPO=url` | install from another hub (a fork) |
+
+It adds the submodule `.dpcli` at the latest release, writes `language` and `worktree.setup` into the config, runs `init`, and prints the commit command (it never commits). A vendored (copied) `.dpcli` is replaced by the submodule; own agents move to `.dpcli-local/agents/`. Rerunning is safe.
+
+Manual installation:
+
 Recommended as a submodule: dpcli is a separate repository, the project pins its version.
 
 ```
