@@ -94,8 +94,9 @@ def update_dist(a):
     r = run(sys.executable, str(reexec.entry()), "init", cwd=root)
     if r.returncode:
         return [f"update: v{target} checked out, but init failed — fix and run {CLI} init: {short(r.stderr.strip(), 200)}"]
-    wf = str(config.get("workflow") or ".claude/dpcli-workflow.md")
-    paths = [p for p in GENERATED + [wf] if (root / p).exists()]
+    wf = config.repo_path(config.get("workflow"), root=root).resolve()
+    extra = [str(wf.relative_to(root.resolve()))] if root.resolve() in wf.parents else []  # outside the repo: not ours to commit
+    paths = [p for p in GENERATED + extra if (root / p).exists()]
     h = ""
     if run("git", "status", "--porcelain", "--", *paths, cwd=root).stdout.strip():
         h = gitx.commit_paths(root, paths, lang_commit(f"dpcli v{target}", f"dpcli v{target}"))
