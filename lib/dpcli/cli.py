@@ -47,6 +47,10 @@ def hoist_job_opts(argv):
             keep.append(t)
             pos += not t.startswith("--")
         i += 1
+    while i < len(rest) and rest[i] in ("--tmux", "--no-tmux", "--all", "--tmux-session", "--lock"):  # options after <timeout>
+        n = 2 if rest[i] in ("--tmux-session", "--lock") and i + 1 < len(rest) else 1
+        hoisted += rest[i:i + n]
+        i += n
     return ["job", *hoisted, *keep, *rest[i:]]
 
 

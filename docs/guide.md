@@ -112,6 +112,10 @@ It also checks the PRs and issues this project sent with `contribute`: merged �
 | `--pin vN` / `--unpin` | never update above vN (`.dpcli-local/update.json`, committed) |
 | `--prs-only` | only check own PRs/issues |
 
+## Long checks
+
+`accept` remembers how long each check took (`<log_dir>/<ID>/results.json`). When the same checks took longer than `checks.bg_after` seconds last time (default 100; 0 — never), `accept` runs itself as a background job and prints the wait command (`job wait dp-accept-<ID> <timeout>`); `--fg` stays in the foreground. A check's own timeout: `task new|set … --check-timeout NAME SEC` (default 900). `lock cpu|gpu` runs the command in the foreground with its output (`--tmux` for a window). Job names are per copy (`<copy>~<name>`), so two copies starting `acc` do not collide; `job wait <name>` from the same copy finds its job.
+
 ## Config
 
 `dpcli.json` or `dpcli.yml`/`dpcli.yaml` at the project root (searched upward from the current directory to the git root; json wins if both exist). All keys are optional. Full list with comments and defaults — [`dpcli.example.yml`](../dpcli.example.yml). In brief:
