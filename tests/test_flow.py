@@ -56,8 +56,8 @@ class Flow(unittest.TestCase):
         tpl = json.loads(p.ok("report", "--template"))
         self.assertEqual(set(tpl) >= {"status", "summary", "commits", "checks"}, True)
         for bad in ('{"status": "wat"}', "не json", report(["echo"])):  # последний: нет результата проверки bad
-            self.assertNotEqual(p.run("report", eng, input=bad)[0], 0, bad)
-        p.ok("report", eng, input=report(["echo", "bad"]))
+            self.assertNotEqual(p.run("report", eng, "-", input=bad)[0], 0, bad)
+        p.ok("report", eng, "-", input=report(["echo", "bad"]))
         self.assertIn("done", p.ok("report", eng, "--show"))
 
         # accept: FAIL on a failing check
@@ -82,7 +82,7 @@ class Flow(unittest.TestCase):
         self.assertIn("accepted", p.ok("log", eng, "-n", "1"))
 
         # writer: review=false -> accepted at once
-        p.ok("report", wri, input=report(["ok"]))
+        p.ok("report", wri, "-", input=report(["ok"]))
         p.ok("accept", wri)
         self.assertIn("accepted", p.ok("log", wri, "-n", "1"))
 

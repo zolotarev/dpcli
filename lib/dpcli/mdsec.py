@@ -35,6 +35,15 @@ def match_sections(heads, q):
         found = [n for n, (_, _, t) in enumerate(heads) if test(_norm(t))]
         if found:
             return found
+    parts = [p.strip() for p in re.split(r"\s+/\s+|[()]", q) if p.strip() and p.strip() != q]
+    for p in reversed(parts):  # "5. Tasks / DS-0", "4. Tasks (PF-5)": the most specific part first
+        pl = _norm(p.lstrip("§"))
+        if not re.search(r"[^\W\d_]", pl):  # "1", "2.": a bare number would match any numbered heading
+            continue
+        for test in (lambda t: t == pl, lambda t: t.startswith(pl)):  # no numbers, no substrings: a bad ref must fail
+            found = [n for n, (_, _, t) in enumerate(heads) if test(_norm(t))]
+            if found:
+                return found
     return []
 
 

@@ -27,11 +27,13 @@ def plan_path(target, contracts=False):
 
 
 def cmd_plan(a):
+    words = a.section or []
     if a.target == "edit":
-        if not a.section or not a.extra:
+        if len(words) < 2:
             raise DpError(f"{CLI} plan edit <module|FILE.md> <section> --append|--replace OLD NEW|--set [FILE|-]")
-        a.target, a.section = a.section, a.extra
+        a.target, a.section = words[0], " ".join(words[1:])
         return cmd_plan_edit(a)
+    a.section = " ".join(words)
     path = plan_path(a.target, a.contracts)
     if not path.exists():
         raise DpError(f"no file {rel(path)}")
@@ -194,7 +196,7 @@ def cmd_render(a):
 
 def register(sp):
     q = sp.add_parser("plan", help="plan table of contents or section (number from TOC or heading prefix); plan edit: edit")
-    q.add_argument("target", metavar="module|FILE.md|edit"); q.add_argument("section", nargs="?"); q.add_argument("extra", nargs="?")
+    q.add_argument("target", metavar="module|FILE.md|edit"); q.add_argument("section", nargs="*", help="number or heading; several words need no quotes")
     q.add_argument("--contracts", action="store_true", help="module contracts file instead of plan")
     q.add_argument("--append", metavar="TEXT", help="edit: append to end of section")
     q.add_argument("--replace", nargs=2, metavar=("OLD", "NEW"),

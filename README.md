@@ -15,7 +15,7 @@ BL-1 dp-engineer: Invoice totals
 Copy: ~/worktrees/app/billing-BL-1  branch: billing/BL-1 (from feature/billing)
 Do: .dpcli/dpcli task show BL-1  · plan: .dpcli/dpcli plan billing <section>
 Scope: only src/billing.py
-Done when: .dpcli/dpcli accept BL-1 --dry → PASS; then .dpcli/dpcli report BL-1 < r.json (schema: .dpcli/dpcli report --template BL-1)
+Done when: .dpcli/dpcli accept BL-1 --dry → PASS; report: build/dpcli/BL-1/report.json → .dpcli/dpcli report BL-1
 Reply: one line «BL-1 reported» | «BL-1 blocked: <reason ≤15 words>» | «BL-1 contract: <what to change>»
 
 $ .dpcli/dpcli accept BL-1 --dry

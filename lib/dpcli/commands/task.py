@@ -71,6 +71,7 @@ def cmd_task_new(a):
         raise DpError(f"--type «{card['type']}»: not an executor (available: {', '.join(types) or 'none'}; "
                       f"agents in {config.get('agents_dir')}/*.md, dpcli_role: executor)")
     validate_checks(card.get("accept"))
+    check_plan_ref(a.module, card.get("plan_ref"))
     ensure_module(a.module, home)
     card["created"] = card.get("created") or now()
     write_json(p, card)
@@ -80,6 +81,25 @@ def cmd_task_new(a):
                                   if empty else ""))
     if not a.no_copy:
         print(make_copy(card))
+
+
+def _report_path(tid):
+    from .report import report_file  # lazy: task does not depend on report at import time
+    return rel(report_file(tid))
+
+
+def check_plan_ref(mod, ref):
+    """A card's plan_ref must name an existing plan section (when the plan file exists)."""
+    if not ref:
+        return
+    from ..mdsec import find_section, headings
+    from .plan import plan_path
+    try:
+        path = plan_path(mod)
+    except DpError:
+        return
+    if path.is_file() and find_section(headings(path.read_text())[1], ref) is None:
+        raise DpError(f"plan_ref \"{ref}\" is not a section of {rel(path)} (sections: {CLI} plan {mod})")
 
 
 def validate_checks(checks):
@@ -158,8 +178,7 @@ def cmd_task_brief(a):
              f"Copy: {cp}  branch: {br} (from {base})",
              f"Do: {CLI} task show {tid}  · plan: {CLI} plan {mod} {sect}",
              bound,
-             f"Done when: {CLI} accept {tid} --dry → PASS; then {CLI} report {tid} < r.json "
-             f"(schema: {CLI} report --template {tid})",
+             f"Done when: {CLI} accept {tid} --dry → PASS; report: {_report_path(tid)} → {CLI} report {tid}",
              f"Reply: one line «{tid} reported» | «{tid} blocked: <reason ≤15 words>» | «{tid} contract: <what to change>»"]
     print("\n".join(L))
 
@@ -239,6 +258,8 @@ def cmd_task_set(a):
         acc[:] = [c for c in acc if c.get("name") != f] + [{"name": f, "tests": f}]
         changed.append(f"accept:{f}")
     validate_checks(card.get("accept"))
+    if "plan_ref" in changed:
+        check_plan_ref(mod, card.get("plan_ref"))
     if not changed:
         raise DpError("nothing to change: field=value, --check, --test, --drop-check, --contract")
     card["edited"] = now()
@@ -315,7 +336,7 @@ def cmd_task_show(a):
     L.append(f"Long runs: `{CLI} job start <name> <timeout_s> <command…>`, wait with `{CLI} job wait <name> <timeout_s>` "
              "in the background (run_in_background), not `until grep` loops.")
     rx = ", ".join(f"«{k}»" for k in card.get("report_extra") or [])
-    L.append(f"Report: {CLI} report {card['id']} < r.json (schema with the card's fields: {CLI} report --template {card['id']})"
+    L.append(f"Report: write {_report_path(card['id'])}, then {CLI} report {card['id']} (schema with the card's fields: {CLI} report --template {card['id']})"
              f"{'; required top-level report fields: ' + rx if rx else ''}; finish with dpcli feedback "
              "(field dp_feedback).")
     if full:
