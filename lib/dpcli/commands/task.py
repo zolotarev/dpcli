@@ -65,6 +65,7 @@ def cmd_task_new(a):
         card["accept"].append({"name": f, "tests": f})
     for name, cmd, exp in a.check or []:
         card["accept"].append({"name": name, "cmd": cmd, "expect": expect_arg(exp)})
+    set_timeouts(card, a.check_timeout)
     types = agents.executor_types()
     if not card["type"]:
         raise DpError(f"--type required ({'|'.join(types) or 'no agents with dpcli_role: executor'})")
@@ -120,6 +121,18 @@ def related_tests(card, cwd, limit=6):
     args = ["grep", "-l", "-w", "-F"] + [x for s in sorted(stems) for x in ("-e", s)] + ["--", "*test*", "*spec*"]
     found = [f for f in gitx.git(*args, cwd=cwd).splitlines() if f and not path_in(f, pats)]
     return found[:limit] + ([f"… (+{len(found) - limit})"] if len(found) > limit else [])
+
+
+def set_timeouts(card, pairs):
+    """--check-timeout NAME SEC: per-check timeout in the card (default 900 s). -> names changed."""
+    out = []
+    for name, sec in pairs or []:
+        c = next((c for c in card.get("accept") or [] if c.get("name") == name), None)
+        if c is None or not str(sec).isdigit():
+            raise DpError(f"--check-timeout {name} {sec}: no such check, or seconds not a number")
+        c["timeout"] = int(sec)
+        out.append(name)
+    return out
 
 
 def validate_checks(checks):
@@ -277,6 +290,7 @@ def cmd_task_set(a):
     for f in a.test or []:
         acc[:] = [c for c in acc if c.get("name") != f] + [{"name": f, "tests": f}]
         changed.append(f"accept:{f}")
+    changed += [f"timeout:{n}" for n in set_timeouts(card, a.check_timeout)]
     validate_checks(card.get("accept"))
     if {"scope", "dont_touch"} & set(changed):
         check_bounds(card)
@@ -413,6 +427,8 @@ def register(sp):
     q.add_argument("--test", action="append", metavar="FILTER", help="check: project tests (checks.tests, {filter}=FILTER), 0 failed")
     q.add_argument("--check", action="append", nargs=3, metavar=("NAME", "CMD", "EXPECT"),
                    help="EXPECT: exit=N | re:<regex> | !re:<regex> | num:<regex with group> <op>N | tests")
+    q.add_argument("--check-timeout", dest="check_timeout", action="append", nargs=2, metavar=("NAME", "SEC"),
+                   help="timeout of a check, s (default 900)")
     q.add_argument("--no-copy", dest="no_copy", action="store_true",
                    help="do not create the task copy and branch (default: git worktree add -b <branch> <copy> <base>)")
     q.add_argument("--force", action="store_true"); q.add_argument("--by")
@@ -431,6 +447,8 @@ def register(sp):
     q = tsp.add_parser("set", help="edit a card: field=value | field+=item | field-=item (JSON or string)")
     q.add_argument("id"); q.add_argument("ops", nargs="*", metavar="FIELD=VALUE")
     q.add_argument("--check", action="append", nargs=3, metavar=("NAME", "CMD", "EXPECT"), help="add/replace a check")
+    q.add_argument("--check-timeout", dest="check_timeout", action="append", nargs=2, metavar=("NAME", "SEC"),
+                   help="timeout of a check, s")
     q.add_argument("--test", action="append", metavar="FILTER", help="add/replace a tests check (checks.tests)")
     q.add_argument("--drop-check", dest="drop_check", action="append", metavar="NAME", help="remove a check")
     q.add_argument("--contract", action="append", metavar="NAME@VERSION", help="bump a contract version (or add it)")

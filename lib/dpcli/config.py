@@ -36,6 +36,8 @@ DEFAULTS = {
         # test-run summary regexp: groups (?P<total>) and (?P<failed>), optionally (?P<skipped>);
         # None — built-in «N tests, M failed[, K skipped]» (Russian form also accepted); no match — judge by exit code
         "tests_summary": None,
+        # accept runs in the background (job) when its checks took longer than this last time, s; 0 — never
+        "bg_after": 100,
     },
     "artifacts_dir": "build/artifacts",
     "reserved_codes": [],

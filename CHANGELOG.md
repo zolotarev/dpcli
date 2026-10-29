@@ -1,5 +1,11 @@
 # Changelog
 
+## 17
+- `accept` goes to the background by itself when its checks took longer than `checks.bg_after` (100 s) last time, and prints the wait command; `--fg` stays (21 reports: long foreground runs hit the agent's tool timeout).
+- `task new|set --check-timeout NAME SEC`: a check's timeout in the card.
+- `lock` runs in the foreground with its output by default; `--tmux` for a window (12 reports: output lost in a tmux job).
+- Job names are per copy (`<copy>~<name>`): copies starting the same name no longer read each other's job (3 reports).
+
 ## 16
 - Scope checks no longer fail on files the card itself requires (25 reports): exclusions are `!pattern` entries in `scope`/`dont_touch`; prose like "src/api/ except a.py" is rejected at `task new`/`task set`; a scope path or glob directory inside `dont_touch` is rejected there too; files brought into the task branch by merges no longer count — the net diff restricted to the branch's own commits (accepted limitation: edits made while resolving a merge are not checked — `accept` says so when the branch has merges); `task new` lists test files that mention scope files so they can be added up front.
 

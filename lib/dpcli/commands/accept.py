@@ -12,7 +12,7 @@ from pathlib import Path
 from .. import agents, config, copies, gitx, reexec
 from ..journal import add_event, by_default, expect_arg, find_task
 from ..util import CLI, DpError, die, now, read_json, rel, short, write_json
-from .jobs import job_start, tmux_args, tmux_opts
+from .jobs import job_start, qualify, tmux_args, tmux_opts
 
 
 def parse_expect(exp):
@@ -256,7 +256,7 @@ def scope_check(card, cwd, mod):
 
 def accept_bg(a, cwd, logdir):
     """Background run (long checks) via job; the job re-runs accept itself and writes the event."""
-    skip = {"--bg"}
+    skip = {"--bg", "--fg"}
     argv, it = [], iter(sys.argv[1:])
     for x in it:
         if x in skip:
@@ -269,13 +269,21 @@ def accept_bg(a, cwd, logdir):
         if x.startswith("--timeout="):
             continue
         argv.append(x)
-    name = f"dp-accept-{a.id}"
+    short_name = f"dp-accept-{a.id}"  # job names are per copy; `job wait` from this copy finds it by the short name
+    name = qualify(short_name)
     try:
-        job_start(name, a.timeout, [*reexec.self_cmd(), *argv, "--cwd", str(cwd)], tmux_opts(a))
+        job_start(name, a.timeout, [*reexec.self_cmd(), *argv, "--fg", "--cwd", str(cwd)], tmux_opts(a))
     except DpError as e:
         die(str(e))
-    print(f"wait: {CLI} job wait {name} {a.timeout}; result in events ({CLI} log {a.id}), logs in {rel(logdir)}")
+    print(f"wait: {CLI} job wait {short_name} {a.timeout}; result in events ({CLI} log {a.id}), logs in {rel(logdir)}")
     sys.exit(0)
+
+
+def expected_seconds(logdir, checks, jobs):
+    """Duration of the same checks last time (results.json): sum, or the longest one when run in parallel."""
+    store = read_json(logdir / "results.json") or {}
+    durs = [float((store.get(c.get("name")) or {}).get("dur") or 0) for c in checks]
+    return (max(durs, default=0) if jobs > 1 else sum(durs))
 
 
 def cmd_accept(a):
@@ -291,6 +299,11 @@ def cmd_accept(a):
     logdir = config.repo_path(config.get("checks.log_dir", "build/dpcli")) / a.id
     logdir.mkdir(parents=True, exist_ok=True)
     if a.bg:
+        return accept_bg(a, cwd, logdir)
+    est = expected_seconds(logdir, checks, a.jobs)
+    limit = int(config.get("checks.bg_after", 100) or 0)
+    if not a.fg and limit and est > limit:  # a foreground run this long hits the agent's tool timeout
+        print(f"{a.id}: last run took ~{est:.0f} s > {limit} s — running in the background ({CLI} accept … --fg to wait here)")
         return accept_bg(a, cwd, logdir)
     with cf.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as ex:
         def one(ic):
@@ -348,6 +361,7 @@ def register(sp):
     q.add_argument("--no-review", dest="no_review", action="store_true",
                    help="types with dpcli_review: accepted without review (default: PASS -> checked, awaits reviewer)")
     q.add_argument("--full", action="store_true", help="log paths for PASS too"); q.add_argument("--by")
+    q.add_argument("--fg", action="store_true", help="stay in the foreground even if the checks are known to be long")
     q.add_argument("--bg", action="store_true", help=f"in the background via job (long checks); wait with {CLI} job wait dp-accept-<ID>")
     q.add_argument("--timeout", type=int, default=3600, metavar="SEC", help="with --bg: overall background timeout (3600)")
     tmux_args(q)

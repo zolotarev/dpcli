@@ -21,6 +21,19 @@ def job_dir():
     return d
 
 
+def qualify(name):
+    """Job names are per copy ("<copy>~<name>"): two copies starting "acc" must not read each other's job.
+    A name that already has "~" (another copy's job) is used as is."""
+    if not name or "~" in name:
+        return name
+    try:
+        from .. import gitx
+        tag = gitx.toplevel().name
+    except DpError:
+        return name
+    return f"{re.sub(r'[^\w.-]', '_', tag)}~{name}"
+
+
 def job_files(name):
     d = job_dir()
     return d / f"{name}.pid", d / f"{name}.log", d / f"{name}.rc"
@@ -197,6 +210,7 @@ def job_stop(name):
 
 
 def cmd_job(a):
+    a.name = qualify(a.name)
     pidf, log, rcf = job_files(a.name) if a.name else (None, None, None)
     if a.action == "start":
         if not a.cmd or a.timeout is None:
@@ -305,7 +319,7 @@ def cmd_lock(a):
     args = list(a.args)
     if args[:1] == ["status"]:
         return lock_status()
-    usage = f"{CLI} lock cpu|gpu <name> [--timeout SEC] [--no-tmux] [--tmux-session S] -- <command…>  |  {CLI} lock status"
+    usage = f"{CLI} lock cpu|gpu <name> [--timeout SEC] [--tmux [--tmux-session S]] -- <command…>  |  {CLI} lock status"
     if "--" not in args or len(args) < 4 or args[0] not in ("cpu", "gpu"):
         raise DpError(usage)
     k = args.index("--")
@@ -315,7 +329,8 @@ def cmd_lock(a):
     res, holder, timeout = head[0], head[1], None
     if "--timeout" in head:
         timeout = int(head[head.index("--timeout") + 1])
-    tm_args = argparse.Namespace(no_tmux="--no-tmux" in head,
+    # foreground by default: the output goes to the caller (accept logs, regex checks); a tmux window only on --tmux
+    tm_args = argparse.Namespace(no_tmux="--tmux" not in head,
                                  tmux_session=head[head.index("--tmux-session") + 1] if "--tmux-session" in head else None)
     tm = tmux_opts(tm_args)
     slots = lock_slots(res)
