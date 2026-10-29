@@ -18,14 +18,17 @@ def run(cmd):
 class BashGuard(unittest.TestCase):
     def test_blocks_shell_edits(self):
         for cmd in ("sed -i 's/a/b/' src/x.ts", "sed -Ei.bak 's/a/b/' f", "perl -pi -e 's/a/b/' f",
-                    "cd src\nsed -i 's/a/b/' x.ts", "set -e\nperl -pi -e 's/a/b/' f", "sed -i 's/a/b/' f  # bulk-edit",
+                    "cd src\nsed -i 's/a/b/' x.ts", "set -e\nperl -pi -e 's/a/b/' f",
+                    "sed -i 's/a/b/' f  # bulk-edit",  # only a comment: there is no bypass marker
+                    "cat <<'EOF'\ntext\nEOF\nsed -i 's/a/b/' f",  # after a closed heredoc
+                    "grep x <<< word\nsed -i 's/a/b/' f",  # a here-string is not a heredoc
                     "cat > src/x.ts <<'EOF'\nx\nEOF", "python3 - <<'EOF'\nfrom pathlib import Path\nPath('a').write_text('x')\nEOF",
                     "python3 - <<'EOF'\nopen('a', 'w').write('x')\nEOF"):
             code, err = run(cmd)
             self.assertEqual(code, 2, cmd)
             self.assertIn("Edit", err)
 
-    def test_allows_programs_reads_and_marked_bulk_edits(self):
+    def test_allows_programs_reads_and_quoted_text(self):
         for cmd in ("rg -n foo src", "sed -n '1,20p' f", "python3 - <<'EOF'\nprint(1)\nEOF", "cat f | jq .",
                     "pnpm exec vitest run", ".dpcli/dpcli review X --from - <<'JSON'\n{}\nJSON",
                     "python3 - <<'EOF'\nimport sys\nsys.stdout.write('x')\nEOF", "git commit -m 'sed -i is gone'",

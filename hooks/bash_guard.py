@@ -27,7 +27,7 @@ def split(cmd):
                 bodies.append(ln)
             continue
         lines.append(re.sub(r"'[^']*'|\"[^\"]*\"", "''", ln))
-        m = re.search(r"<<-?\s*['\"]?(\w+)", ln)
+        m = re.search(r"(?<!<)<<(?!<)-?\s*['\"]?([A-Za-z_]\w*)", ln)  # not `<<<` (here-string), not `1 << 3`
         if m:
             end = m[1]
     return lines, "\n".join(bodies)
@@ -45,7 +45,7 @@ def main():
     if not hits:
         return 0
     print(f"dpcli: {hits[0]} edits files through the shell — use the Edit tool (exact replacement) or Write "
-          f"(new file); read with Read. The same change in many files: Edit per file, or ast-grep run -p … -r … -U.",
+          f"(new file); read with Read.",
           file=sys.stderr)
     return 2
 
