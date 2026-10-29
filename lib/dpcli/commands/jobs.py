@@ -31,7 +31,8 @@ def qualify(name):
         tag = gitx.toplevel().name
     except DpError:
         return name
-    return f"{re.sub(r'[^\w.-]', '_', tag)}~{name}"
+    tag = re.sub(r"[^\w.-]", "_", tag)
+    return f"{tag}~{name}"
 
 
 def job_files(name):

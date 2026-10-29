@@ -70,6 +70,8 @@ checks:
   # tests_summary: '(?P<total>\d+) tests, (?P<failed>\d+) failed'
   # Where check logs are written: <log_dir>/<ID>/.
   log_dir: build/dpcli
+  # accept goes to the background when its checks took longer than this last time, s (0 — never).
+  bg_after: 100
 
 # Where agents put screenshots and images (a hint in the report template); one subfolder per task.
 artifacts_dir: build/artifacts
