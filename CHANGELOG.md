@@ -1,7 +1,7 @@
 # Changelog
 
 ## 20
-- Process rule: files are read and edited with the Read, Edit and Write tools — executors in the first project made ≈9800 Bash calls and almost no Edit/Write: ≈500 `python3 -` replacements, ≈360 `sed -i`, ≈310 `cat >`, ≈800 `sed -n`; each pays the whole text in output and breaks on escaping. Bash is for running programs (`rg`, `fd`, `jq`, `ast-grep`).
+- Process rule: files are read and edited with the Read, Edit and Write tools, Bash runs programs (`rg`, `fd`, `jq`, `ast-grep`) — executors had edited files almost only through `python3 -`/`sed -i`/`cat >` heredocs.
 - `install.sh --tools`: quiet non-interactive apt; a hint when `~/.local/bin` is not on PATH.
 
 ## 19

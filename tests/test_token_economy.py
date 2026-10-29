@@ -21,6 +21,8 @@ class TokenEconomy(unittest.TestCase):
         out = self.p.ok("task", "show", "AA-1", cwd=self.tc)
         self.assertIn("Never `git stash`", out)  # from "General rules"
         self.assertNotIn("## Roles", out)  # not the whole process description
+        self.assertIn("Read (offset/limit), Edit, Write", out)  # files through the built-in tools, not heredocs
+        self.assertIn("`ast-grep`", out)
 
     def test_re_review_points_to_previous_issues_and_new_changes(self):
         first = self.p.ok("task", "brief", "AA-1", "--review", cwd=self.mc)

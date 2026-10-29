@@ -121,7 +121,9 @@ if [ ${#missing[@]} -gt 0 ] && [ "$TOOLS" = 1 ]; then
     brew install $(printf '%s\n' "${missing[@]}" | sed 's/^rg$/ripgrep/') || true
   elif command -v apt-get >/dev/null; then
     pk=(); for t in "${missing[@]}"; do case $t in rg) pk+=(ripgrep);; fd) pk+=(fd-find);; jq) pk+=(jq);; esac; done
-    [ ${#pk[@]} -gt 0 ] && $sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${pk[@]}" >/dev/null 2>&1 || true
+    if [ ${#pk[@]} -gt 0 ] && ! $sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${pk[@]}" >/dev/null 2>&1; then
+      say "apt-get install ${pk[*]} failed (run it by hand to see why)"
+    fi
     command -v fdfind >/dev/null && ! command -v fd >/dev/null && mkdir -p ~/.local/bin && ln -sf "$(command -v fdfind)" ~/.local/bin/fd
   fi
   if [[ " ${missing[*]} " == *" ast-grep "* ]] && ! command -v ast-grep >/dev/null; then
@@ -131,7 +133,8 @@ if [ ${#missing[@]} -gt 0 ] && [ "$TOOLS" = 1 ]; then
   missing=(); for t in rg fd jq ast-grep; do command -v "$t" >/dev/null 2>&1 || missing+=("$t"); done
 fi
 [ ${#missing[@]} -gt 0 ] && say "missing fast tools for agents: ${missing[*]} (rerun with --tools to install)"
-case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) [ -d "$HOME/.local/bin" ] && say "add ~/.local/bin to PATH (fd, ast-grep may be installed there)" ;; esac
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *)
+  { [ -x "$HOME/.local/bin/fd" ] || [ -x "$HOME/.local/bin/ast-grep" ]; } && say "add ~/.local/bin to PATH: fd / ast-grep are there" ;; esac
 
 paths=".gitmodules .dpcli dpcli.yml dpcli.json dpcli.yaml .dpcli-local .claude CLAUDE.md .gitignore"
 changed=$(git status --porcelain -- $paths 2>/dev/null || true)
