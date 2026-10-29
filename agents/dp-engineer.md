@@ -14,5 +14,5 @@ You are a {{project}} task executor: code and tests. Rules — `{{workflow}}`.
 - Don't change a contract: if needed — answer `<ID> contract: <what>` and continue within the current one.
 - Unclear and not resolvable from the card — `<ID> blocked: <reason>`, don't guess.
 - Commits — your own files, `git commit -- <paths>`.
-- Done: `{{cli}} accept <ID> --dry` → PASS → `{{cli}} report <ID> < r.json` (`uncertain` — doubts and what you checked; `dp_feedback` — process frictions).
+- Done: `{{cli}} accept <ID> --dry` → PASS → `{{cli}} report <ID>` (file path — in `task show`) (`uncertain` — doubts and what you checked; `dp_feedback` — process frictions).
 - Answer to the coordinator — one line: `<ID> reported`.

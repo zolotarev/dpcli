@@ -13,8 +13,14 @@ VERDICTS = ("accept", "rework")
 MAX_ISSUES = 7
 
 
+def report_file(tid):
+    """Per-task report file in the copy: a shared path (/tmp/r.json) let parallel agents overwrite each other."""
+    return config.repo_path(config.get("checks.log_dir", "build/dpcli")) / tid / "report.json"
+
+
 def report_template():
     return {
+        "id": "<task ID>",
         "status": "done | partial | blocked | failed",
         "summary": "1-3 sentences: what was done",
         "commits": ["abc1234 short description"],
@@ -82,6 +88,7 @@ def cmd_report(a):
         if a.id:  # card report_extra keys become top-level fields
             _, home = find_task(a.id)
             card = read_json(home / "tasks" / f"{a.id}.json") or {}
+            t["id"] = a.id
             for k in card.get("report_extra") or []:
                 t[k] = "… (required card field)"
         print(json.dumps(t, ensure_ascii=False, indent=2))
@@ -120,11 +127,19 @@ def cmd_report(a):
             L.append("dpcli: " + short(r["dp_feedback"], 200))
         print("\n".join(L))
         return
-    src = sys.stdin.read() if a.file in (None, "-") else Path(a.file).read_text()
+    if a.file == "-" or (a.file is None and not sys.stdin.isatty() and not report_file(a.id).is_file()):
+        src = sys.stdin.read()
+    else:
+        f = Path(a.file) if a.file else report_file(a.id)
+        if not f.is_file():
+            raise DpError(f"no report file {rel(f)}: write it there ({CLI} report --template {a.id}), or pass FILE / stdin")
+        src = f.read_text()
     try:
         r = json.loads(src)
     except json.JSONDecodeError as e:
         raise DpError(f"report: invalid JSON ({e}); schema: {CLI} report --template")
+    if isinstance(r, dict) and r.get("id") not in (None, "", a.id, "<task ID>"):
+        raise DpError(f"this report is for {r['id']}, not {a.id} — a file shared with another agent? use {rel(report_file(a.id))}")
     errs = validate_report(r, card)
     if errs:
         raise DpError(f"{a.id}: report rejected: " + "; ".join(errs))
@@ -240,7 +255,7 @@ def cmd_review(a):
 
 
 def register(sp):
-    q = sp.add_parser("report", help=f"executor report: {CLI} report ID < r.json | --show | --template")
+    q = sp.add_parser("report", help=f"executor report: {CLI} report ID [FILE|-] (default <log_dir>/ID/report.json) | --show | --template")
     q.add_argument("id", nargs="?"); q.add_argument("file", nargs="?")
     q.add_argument("--show", action="store_true"); q.add_argument("--template", action="store_true")
     q.add_argument("--full", action="store_true"); q.add_argument("--by")

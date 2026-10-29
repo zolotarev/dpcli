@@ -35,6 +35,11 @@ def match_sections(heads, q):
         found = [n for n, (_, _, t) in enumerate(heads) if test(_norm(t))]
         if found:
             return found
+    parts = [p.strip() for p in re.split(r"\s+/\s+|[()]", q) if p.strip() and p.strip() != q]
+    for p in reversed(parts):  # "5. Tasks / DS-0", "4. Tasks (PF-5)": the most specific part first
+        found = match_sections(heads, p)
+        if found:
+            return found
     return []
 
 
