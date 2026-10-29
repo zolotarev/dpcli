@@ -154,10 +154,6 @@ def set_timeouts(card, pairs):
 def validate_checks(checks):
     """Card checks are parsed right away (task new/set), not only in accept."""
     from .accept import parse_expect
-    names = [c.get("name") for c in checks or [] if isinstance(c, dict)]
-    dup = sorted({n for n in names if n and names.count(n) > 1})
-    if dup:  # results and logs are kept by check name
-        raise DpError(f"duplicate check names: {', '.join(dup)} (task set … --drop-check NAME replaces one)")
     for c in checks or []:
         if not isinstance(c, dict) or not c.get("name"):
             raise DpError(f"check {json.dumps(c, ensure_ascii=False)}: object with name required")

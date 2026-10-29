@@ -1,9 +1,7 @@
 # Changelog
 
 ## 22
-- `init` installs a `PreToolUse` hook (`hooks/bash_guard.py`): editing files through Bash (`sed -i`, `perl -i`, `cat > file <<`, `python3 -` writing files) is refused with a pointer to Edit/Write; programs and reads pass; `# bulk-edit` in the command allows a deliberate mass edit. The v20 rule alone was not expected to change the habit (≈1200 such edits in the first project).
-- `update` re-renders `.claude/` when the version is current but the generated files are not (`init --check`).
-- `task new|set` rejects duplicate check names (results and logs are kept by name).
+- `init` installs a `PreToolUse` hook (`hooks/bash_guard.py`): editing files through Bash (`sed -i`, `perl -i`, `cat > file <<`, `python3 -` heredocs writing files) is refused with a pointer to Edit/Write; programs, reads and quoted text pass. Every command line outside heredoc bodies is checked; `echo/printf/tee > file` are not covered on purpose. The v20 rule alone was not expected to change the habit (≈1200 such edits in the first project).
 
 ## 21
 - Reviewing work that lives in the main copy (a `--no-copy` card): `task brief` names the copy and branch where the work is instead of a copy that does not exist; `accept --here` checks the uncommitted changes against the scope instead of skipping it.
