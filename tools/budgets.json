@@ -5,7 +5,7 @@
   "duplicate_windows": 0,
   "risky": {
     "rm -rf": 0,
-    "force": 21,
+    "force": 22,
     "reset --hard": 0,
     "shell=True": 0,
     "push": 4

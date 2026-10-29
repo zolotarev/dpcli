@@ -66,6 +66,33 @@ class Install(unittest.TestCase):
         again = self.install("--lang", "en", "--commit-lang", "en")
         self.assertIn("nothing changed", again)
 
+    def test_vendored_copy_deleted_from_disk(self):
+        shutil.rmtree(self.p.root / ".dpcli")  # tracked in git, gone from the working tree
+        out = self.install("--lang", "en", "--commit-lang", "ru")
+        self.assertIn("replaced by the submodule", out)
+        self.assertIn("160000", git("ls-files", "-s", ".dpcli", cwd=self.p.root))
+
+    def test_gitlink_without_gitmodules(self):
+        self.drop_vendored()
+        r = self.p.root
+        sha = git("rev-parse", "HEAD", cwd=self.p.tmp / "src")
+        git("update-index", "--add", "--cacheinfo", f"160000,{sha},.dpcli", cwd=r)  # a gitlink, no .gitmodules
+        git("commit", "-q", "-m", "broken submodule", cwd=r)
+        out = self.install("--lang", "en", "--commit-lang", "en")
+        self.assertIn("registered", out)
+        self.assertTrue((r / ".dpcli" / "dpcli").is_file())
+        self.assertIn(".dpcli", (r / ".gitmodules").read_text())
+
+    def test_gitlink_to_unknown_commit_is_re_added(self):
+        self.drop_vendored()
+        r = self.p.root
+        git("update-index", "--add", "--cacheinfo", f"160000,{'1' * 40},.dpcli", cwd=r)  # commit the hub doesn't have
+        git("commit", "-q", "-m", "stale submodule", cwd=r)
+        out = self.install("--lang", "en", "--commit-lang", "en")
+        self.assertIn("registered", out)
+        self.assertTrue((r / ".dpcli" / "dpcli").is_file())
+        self.assertNotIn("1" * 40, git("ls-files", "-s", ".dpcli", cwd=r))
+
 
 if __name__ == "__main__":
     unittest.main()
