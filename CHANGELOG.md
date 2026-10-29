@@ -1,5 +1,8 @@
 # Changelog
 
+## 24
+- `stats --tokens`: context tokens spent by executors, reviewers and coordinators per module, and per task, read from Claude Code's subagent logs (an agent is attributed by its first message — the dpcli brief). Lets a process change be checked by numbers.
+
 ## 23
 - `update` re-renders `.claude/` when the version is current but the generated files are not (`init --check`) — seen when the submodule was moved by hand; if they stay stale after `init` (edited by hand), it says so instead of re-rendering on every run.
 - `task new|set` rejects duplicate check names: results and logs are kept per name since v21.

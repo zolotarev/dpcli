@@ -95,7 +95,7 @@ After `init`, commit the result (only the main session commits).
 | `feedback show F-n\|TOPIC` | unique texts ×count with task IDs |
 | `feedback new "title" --match REGEX --scope project\|dpcli [--why]` | create a cluster F-n (ledger `.dpcli-local/feedback.jsonl`) |
 | `feedback fix F-n --where … [--pr URL]` · `wontfix F-n --why …` · `reopen F-n` | close / reject / reopen |
-| `stats [module] [--since D]` | tasks, created→accepted, rework rounds, frictions; check durations (median/max s) |
+| `stats [module] [--since D] [--tokens]` | tasks, created→accepted, rework rounds, frictions; check durations (median/max s); `--tokens`: context tokens of executors, reviewers and coordinators and per task, from Claude Code's subagent logs |
 | `contribute F-n [--title T] [--new]` | dpcli-scope fix from `.dpcli` branch `improve/*` → PR to the hub (origin or fork), or +1 on a similar open one; no commits → issue; no `gh` → `build/dpcli/contribute-F-n/` with issue text and patches |
 
 ## Updating automatically
