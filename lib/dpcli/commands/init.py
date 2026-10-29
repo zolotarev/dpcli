@@ -355,7 +355,12 @@ class Init:
         hook = f"{self.cli} update --auto"
         starts = data.setdefault("hooks", {}).setdefault("SessionStart", [])
         has_hook = any(hook in str(h.get("command", "")) for e in starts if isinstance(e, dict) for h in e.get("hooks") or [])
-        add = ([perm] if perm not in allow else []) + ([] if has_hook else ["SessionStart: update --auto"])
+        guard = f'python3 "$CLAUDE_PROJECT_DIR/{relp(DIST / "hooks" / "bash_guard.py", self.root)}"'
+        pre = data["hooks"].setdefault("PreToolUse", [])
+        has_guard = any("bash_guard.py" in str(h.get("command", "")) for e in pre if isinstance(e, dict)
+                        for h in e.get("hooks") or [])
+        add = ([perm] if perm not in allow else []) + ([] if has_hook else ["SessionStart: update --auto"]) \
+            + ([] if has_guard else ["PreToolUse: bash_guard"])
         if not add:
             self.row(".claude/settings.json", "unchanged", perm)
             return
@@ -363,6 +368,8 @@ class Init:
             allow.append(perm)
         if not has_hook:
             starts.append({"hooks": [{"type": "command", "command": hook}]})
+        if not has_guard:  # file edits through the shell → Edit/Write (agents made them by the hundred)
+            pre.append({"matcher": "Bash", "hooks": [{"type": "command", "command": guard}]})
         self.put_text(".claude/settings.json", old, json.dumps(data, ensure_ascii=False, indent=2) + "\n", ", ".join(add))
 
     def gitignore(self):
