@@ -38,6 +38,11 @@ class Feedback(unittest.TestCase):
         self.assertIn("plan", out)
         self.assertNotIn("2 accepted", out)
 
+    def test_list_feedback_is_one_item_per_entry(self):
+        with (self.p.root / "docs" / "plan" / "web" / "events.jsonl").open("a", encoding="utf-8") as f:
+            f.write(ev("2026-10-03T10:00:00", "WB-4", "reported", dp_feedback=["task show truncates addenda", "none"]) + "\n")
+        self.assertIn("frictions 5", self.p.ok("feedback"))
+
     def test_show_lists_unique_texts_with_tasks(self):
         out = self.p.ok("feedback", "show", "accept")
         self.assertIn("×2", out)

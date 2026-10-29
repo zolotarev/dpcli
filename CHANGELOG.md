@@ -1,5 +1,8 @@
 # Changelog
 
+## 26
+- `feedback`: a report's `dp_feedback` given as a list is read as one friction per entry (was a TypeError for the whole ledger).
+
 ## 25
 - `accept`: checks run with stdin from `/dev/null` — a formatter called without files (`prettier --check`) waited on the agent's open stdin until the check timeout.
 

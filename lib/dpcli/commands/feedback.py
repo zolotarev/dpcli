@@ -32,7 +32,9 @@ def items(since="", module=None):
             if t < since:
                 continue
             if e.get("ev") == "reported" and e.get("dp_feedback"):
-                out.append({"t": t, "module": mod, "task": e.get("task"), "text": e["dp_feedback"], "src": "report"})
+                fb = e["dp_feedback"]  # reports may carry a list of frictions: one item each
+                out += [{"t": t, "module": mod, "task": e.get("task"), "text": str(x), "src": "report"}
+                        for x in (fb if isinstance(fb, list) else [fb])]
             elif e.get("ev") == "note" and re.match(r"\s*harness:", e.get("note") or "", re.I):
                 out.append({"t": t, "module": mod, "task": e.get("task"), "src": "note",
                             "text": re.sub(r"^\s*harness:\s*", "", e["note"], flags=re.I)})
