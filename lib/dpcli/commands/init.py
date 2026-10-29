@@ -355,7 +355,9 @@ class Init:
         hook = f"{self.cli} update --auto"
         starts = data.setdefault("hooks", {}).setdefault("SessionStart", [])
         has_hook = any(hook in str(h.get("command", "")) for e in starts if isinstance(e, dict) for h in e.get("hooks") or [])
-        guard = f'python3 "$CLAUDE_PROJECT_DIR/{relp(DIST / "hooks" / "bash_guard.py", self.root)}"'
+        # fail open: without the script (a copy without the submodule) python would exit 2 = "blocked" for every call
+        guard = (f'f="$CLAUDE_PROJECT_DIR/{relp(DIST / "hooks" / "bash_guard.py", self.root)}"; '
+                 f'[ -f "$f" ] || exit 0; exec python3 "$f"')
         pre = data["hooks"].setdefault("PreToolUse", [])
         has_guard = any("bash_guard.py" in str(h.get("command", "")) for e in pre if isinstance(e, dict)
                         for h in e.get("hooks") or [])
