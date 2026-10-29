@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from .. import agents, config, copies, gitx
-from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg,
+from ..journal import (home_root, ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg,
                        find_task, module_home, module_meta, reserved_codes, task_cards)
 from ..util import CLI, DpError, Parser, hm, lang_commit, now, pretty, read_json, read_jsonl, rel, short, subgroup, write_json
 
@@ -81,7 +81,7 @@ def cmd_task_new(a):
     empty = missing_for_brief(card)
     print(f"{a.id}: {rel(p)}" + (f"; empty: {', '.join(empty)} — brief will refuse (fill in: {CLI} task set {a.id} …)"
                                   if empty else ""))
-    hint = related_tests(card)
+    hint = related_tests(card, home_root(home))
     if hint:
         print(f"tests referencing scope files — add those the change will touch ({CLI} task set {a.id} scope+=PATH): "
               + ", ".join(hint))
@@ -108,8 +108,9 @@ def check_plan_ref(mod, ref):
         raise DpError(f"plan_ref \"{ref}\" is not a section of {rel(path)} (sections: {CLI} plan {mod})")
 
 
-def related_tests(card, limit=6):
-    """Test files that mention a scope file's name: the change will likely touch them, so they belong in the scope."""
+def related_tests(card, cwd, limit=6):
+    """Test files that mention a scope file's name: the change will likely touch them, so they belong in the scope.
+    A heuristic (name match, paths containing test/spec), printed as a hint only."""
     from .accept import _pat, path_in
     pats = [p for e in card.get("scope") or [] for p in _pat(e)]
     stems = {Path(p).stem for p in pats if p and not p.startswith("!") and not any(c in p for c in "*?[")
@@ -117,7 +118,7 @@ def related_tests(card, limit=6):
     if not stems:
         return []
     args = ["grep", "-l", "-w", "-F"] + [x for s in sorted(stems) for x in ("-e", s)] + ["--", "*test*", "*spec*"]
-    found = [f for f in gitx.git(*args).splitlines() if f and not path_in(f, pats)]
+    found = [f for f in gitx.git(*args, cwd=cwd).splitlines() if f and not path_in(f, pats)]
     return found[:limit] + ([f"… (+{len(found) - limit})"] if len(found) > limit else [])
 
 

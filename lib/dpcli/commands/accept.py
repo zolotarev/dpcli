@@ -179,7 +179,7 @@ def path_in(path, pats):
             and not any(_hit(path, p[1:]) for p in pats if p.startswith("!")))
 
 
-EXCLUDE_WORDS = re.compile(r"(?<!\w)(кроме|except|excluding|but not|без)(?!\w)", re.I)
+EXCLUDE_WORDS = {"кроме", "except", "excluding", "but", "без"}
 
 
 def check_bounds(card):
@@ -187,7 +187,10 @@ def check_bounds(card):
     dont_touch — both made accept fail on files the card itself requires."""
     for key in ("scope", "dont_touch"):
         for e in card.get(key) or []:
-            if EXCLUDE_WORDS.search(str(e)):
+            m = _NOTE.search(str(e))  # the path part, and a note that *starts* with an exception ("(except a.py)")
+            words = (str(e)[:m.start()] if m else str(e)).lower().split()[1:]
+            note = str(e)[m.end():].strip(" (").lower().split()[:1] if m else []
+            if EXCLUDE_WORDS & set(words + note):
                 raise DpError(f"{key} \"{e}\": write exclusions as separate entries `!<path>`, not as text "
                               f"(e.g. --dont-touch src/api/ --dont-touch '!src/api/a.py')")
     dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
@@ -198,13 +201,15 @@ def check_bounds(card):
 
 
 def changed_files(cwd, base):
-    """Files changed by the branch's own commits (merges excluded: files they bring are not the task's work)
-    plus uncommitted (incl. untracked)."""
-    r = gitx.gitr("-c", "core.quotepath=off", "log", "--first-parent", "--no-merges", "--format=", "--name-only", "-z", f"{base}..HEAD",
-                  cwd=cwd)
-    if r.returncode:
-        raise DpError(f"git log {base}..HEAD: {gitx.gerr(r)}")
-    files = {f.strip("\n") for f in r.stdout.split("\0")}
+    """Net changes of the branch (base...HEAD) made by its own commits, plus uncommitted (incl. untracked).
+    Files only brought in by merges are not the task's work; a file added and reverted is no change. Accepted
+    limitation: edits made while resolving a merge, or work merged from a sub-branch, are not checked."""
+    q = ("-c", "core.quotepath=off")
+    net = gitx.gitr(*q, "diff", "--name-only", "-z", f"{base}...HEAD", cwd=cwd)
+    own = gitx.gitr(*q, "log", "--first-parent", "--no-merges", "--format=", "--name-only", "-z", f"{base}..HEAD", cwd=cwd)
+    if net.returncode or own.returncode:
+        raise DpError(f"git diff/log {base}...HEAD: {gitx.gerr(net if net.returncode else own)}")
+    files = set(net.stdout.split("\0")) & {f.strip("\n") for f in own.stdout.split("\0")}
     files.update(f for _xy, f in gitx.status_entries(cwd, "--untracked-files=all"))
     return sorted(f for f in files if f)
 

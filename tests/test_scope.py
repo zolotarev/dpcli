@@ -29,6 +29,20 @@ class HonestScope(unittest.TestCase):
         code, _, err = self.task("--scope", "src/", "--dont-touch", "src/api/ кроме a.py", ok=False)
         self.assertEqual(code, 1)
         self.assertIn("!<path>", err)
+        code, _, err = self.task("--scope", "src/", "--dont-touch", "src/api/ (кроме a.py)", ok=False)
+        self.assertEqual(code, 1)
+
+    def test_notes_and_path_words_allowed(self):
+        self.task("--scope", "src/except.py — all but the edge case", "--dont-touch", "docs/excluding/")
+
+    def test_added_then_reverted_file_is_no_change(self):
+        tid, tc = self.task("--scope", "src/")
+        self.write(tc, "src/a.py")
+        self.write(tc, "debug.txt")
+        (tc / "debug.txt").unlink()
+        self.p.commit_all("drop debug", cwd=tc)
+        code, out, _ = self.p.run("accept", tid, cwd=tc)
+        self.assertEqual(code, 0, out)
 
     def test_scope_inside_dont_touch_rejected_then_exclusion_works(self):
         code, _, err = self.task("--scope", "src/api/a.py", "--dont-touch", "src/api/", ok=False)
