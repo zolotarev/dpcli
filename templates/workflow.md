@@ -1,6 +1,6 @@
 # Working with agents — {{project}}
 
-Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands; details live in the journal.
+Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands, never retell the journal (report, review, status); details live in the journal.
 
 **Language.** Everything written for people — replies to the user, reports, journal entries, plans, docs — in {{language_text}}. Commit messages in {{language_commits}}.
 
@@ -117,9 +117,11 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 Every turn pays for the whole session context again.
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
 - With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
+- Subagents — only when needed (protocol, waves).
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
-- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`.- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 proposals to the user.
+- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`.
+- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 proposals to the user.
 - **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — never edited in place: a branch `improve/*` in `.dpcli` and `{{cli}} contribute F-n` (a PR to the dpcli hub or a +1 on a similar one); everyone gets it with the next update.
 - The user's remarks about the work — into memory (feedback) at once, without waiting for a review.
