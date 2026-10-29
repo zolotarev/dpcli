@@ -85,3 +85,16 @@ class HonestScope(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StashWarning(unittest.TestCase):
+    def test_accept_warns_about_a_shared_stash(self):
+        p = Project()
+        self.addCleanup(p.cleanup)
+        p.ok("module", "init", "aa", "--code", "AA")
+        p.ok("task", "new", "aa", "--type", "dp-writer", "--title", "T", "--scope", "src", "--check", "c", "true",
+             "exit=0", "--no-copy")
+        (p.root / "README.md").write_text("changed\n")
+        git("stash", "-q", cwd=p.root)
+        code, out, err = p.run("accept", "AA-1", "--dry")
+        self.assertIn("git stash", out + err)

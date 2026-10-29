@@ -23,6 +23,5 @@ flowchart LR
 |---|---|---|
 | shared test database and ports between parallel copies | 15 | project matter; dpcli can offer per-task slots (`{slot}`, `{port}` in `checks.env`) |
 | no baseline: pre-existing failures look like new ones | 6 | `accept --baseline`: the same checks on the module base |
-| `git stash` is shared by all worktrees | 6 (rule in place) | a warning in `accept` when the stash is not empty |
 
 Order follows the ledgers of projects using dpcli: `feedback` issues and their `+1`s. A fix is confirmed when the same friction stops coming back (`⚠ after fix`).
