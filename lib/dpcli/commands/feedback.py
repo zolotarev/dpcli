@@ -133,6 +133,8 @@ def cmd_feedback(a):
         if c["status"] == "wontfix" and not a.all:
             continue
         g = by_c.get(fid, [])
+        if not g and (a.module or a.since):
+            continue  # filtered view: only clusters this module/period has
         after = [i for i in g if c.get("t_fix") and i["t"] > c["t_fix"]]
         print(f"{fid} ×{len(g)} [{c['scope']}] {c['status']}" + (f" ⚠{len(after)} after fix" if after else "")
               + f" — {short(c['title'], 80)}" + (f" · {c['pr']}" if c.get("pr") else ""))

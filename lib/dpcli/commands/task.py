@@ -213,8 +213,12 @@ def cmd_task_brief(a):
         raise DpError(f"{a.id}: card not ready to hand out — missing: {', '.join(miss)} "
                       f"({CLI} task set {a.id} goal=… scope+=… | --check …)")
     tid, cp, br, base = card["id"], card.get("copy"), card.get("branch"), card.get("base")
+    where = f"copy {cp}, branch {br}"
+    if not (cp and Path(cp).expanduser().is_dir()):  # --no-copy: the work is wherever the card was made
+        cp, br = pretty(gitx.toplevel()), gitx.git("branch", "--show-current") or "HEAD"
+        where = f"no task copy — the work is in {cp} ({br})"
     if a.review:
-        L = [f"Review {tid}: copy {cp}, branch {br}.",
+        L = [f"Review {tid}: {where}.",
              f"Data: {CLI} task show {tid} --full; {CLI} report {tid} --show."]
         prev = read_json(home / "tasks" / f"{tid}.review.json") or {}
         if prev.get("verdict") == "rework" and prev.get("head"):
@@ -228,7 +232,7 @@ def cmd_task_brief(a):
         if card.get("dont_touch"):
             bound += "; don't touch " + _fit(card["dont_touch"], max(30, BRIEF_W - len(bound) - 14))
         L = [f"{tid} {card.get('type', '')}: {card.get('title', '')}",
-             f"Copy: {cp}  branch: {br} (from {base})",
+             (f"Copy: {cp}  branch: {br} (from {base})" if where.startswith("copy") else f"Work: {where}"),
              f"Do: {CLI} task show {tid}  · plan: {CLI} plan {mod} {sect}",
              bound,
              f"Done when: {CLI} accept {tid} --dry → PASS; report: {_report_path(tid)} → {CLI} report {tid}",
