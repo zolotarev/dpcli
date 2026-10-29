@@ -3,7 +3,7 @@ import re
 import statistics
 
 from .. import config
-from ..journal import all_modules
+from ..journal import all_modules, task_cards
 from ..util import CLI, DpError, append_jsonl, now, read_json, read_jsonl, short
 
 # dpcli commands and frequent topics: unclustered frictions are grouped by the first one mentioned
@@ -150,6 +150,7 @@ def cmd_stats(a):
     if a.module and a.module not in mods:
         raise DpError(f"module {a.module} not found (have: {', '.join(mods) or 'none'})")
     durs = {}
+    usage = agent_usage({t: m for m, h in mods.items() for t in task_cards(h)}) if a.tokens else {}
     for mod, home in mods.items():
         if a.module and mod != a.module:
             continue
@@ -174,9 +175,59 @@ def cmd_stats(a):
         print(f"{mod}: tasks {len(tasks)} accepted {len(accepted)} | created→accepted "
               + (f"median {statistics.median(lead):.1f}h max {max(lead):.1f}h" if lead else "-")
               + f" | rework {rework} | frictions {nfr}")
+        u = usage.get(mod) if a.tokens else None
+        if u:
+            roles = " · ".join(f"{r} {_m(u[r][0])} ({u[r][1]})" for r in ("executors", "reviewers", "coordinators") if r in u)
+            per = list(u["tasks"].values())
+            print(f"  tokens (context): {roles}" + (f" | per task median {_m(statistics.median(per))}" if per else ""))
     if durs:
         print("checks, s (median/max): " + " · ".join(f"{n} {statistics.median(v):.0f}/{max(v):.0f}"
                                                       for n, v in sorted(durs.items(), key=lambda kv: -max(kv[1]))))
+
+
+def agent_usage(task_module):
+    """{module: {role: [context tokens, agents], "tasks": {ID: tokens}}} from Claude Code's subagent logs of this
+    project. An agent is dpcli's when its first message is a brief: "<ID> <type>: …", "Review <ID>: …", "Module <m>: …"."""
+    import json
+    import re
+    from pathlib import Path
+    from .. import gitx
+    root = gitx.main_worktree()
+    base = Path.home() / ".claude" / "projects" / re.sub(r"[/_.]", "-", str(root)) if root else None
+    out = {}
+    for f in sorted(base.glob("*/subagents/*.jsonl")) if base and base.is_dir() else []:
+        first, ctx = None, 0
+        for line in f.open(errors="replace"):
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if first is None and r.get("type") == "user":
+                c = (r.get("message") or {}).get("content")
+                first = c if isinstance(c, str) else " ".join(x.get("text", "") for x in c or [] if isinstance(x, dict))
+            u = (r.get("message") or {}).get("usage") if r.get("type") == "assistant" else None
+            if u:
+                ctx += u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
+        # English protocol, and the Russian one of older journals ("Ревью <ID>", "Модуль <m>:")
+        m = re.match(r"\s*(?:(Review|Ревью) )?([A-Z]{2,4}-[A-Z]?\d+[a-z]?)\b|\s*(?:Module|Модуль) (\S+?):", first or "")
+        if not m:
+            continue
+        mod = m[3] or task_module.get(m[2])
+        if not mod:
+            continue
+        role = "coordinators" if m[3] else "reviewers" if m[1] else "executors"
+        d = out.setdefault(mod, {"tasks": {}})
+        d.setdefault(role, [0, 0])
+        d[role][0] += ctx
+        d[role][1] += 1
+        if m[2]:
+            d["tasks"][m[2]] = d["tasks"].get(m[2], 0) + ctx
+    return out
+
+
+def _m(n):
+    v = n / 1e6
+    return f"{v:.0f}M" if v >= 10 else f"{v:.2g}M"
 
 
 def _hours(t0, t1):
@@ -202,6 +253,8 @@ def register(sp):
 
     q = sp.add_parser("stats", help="per module: tasks, created→accepted, rework rounds, frictions; check durations")
     q.add_argument("module", nargs="?"); q.add_argument("--since", metavar="DATE")
+    q.add_argument("--tokens", action="store_true", help="context tokens of executors/reviewers/coordinators, per task "
+                                                         "(Claude Code subagent logs)")
     q.set_defaults(func=cmd_stats)
 
 
