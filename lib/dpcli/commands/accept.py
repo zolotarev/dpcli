@@ -187,10 +187,12 @@ def check_bounds(card):
     dont_touch — both made accept fail on files the card itself requires."""
     for key in ("scope", "dont_touch"):
         for e in card.get(key) or []:
+            if str(e).lstrip().startswith("`"):
+                continue  # `a path with spaces` — the path is explicit
             m = _NOTE.search(str(e))  # the path part, and a note that *starts* with an exception ("(except a.py)")
             words = (str(e)[:m.start()] if m else str(e)).lower().split()[1:]
             note = str(e)[m.end():].strip(" (").lower().split()[:1] if m else []
-            if EXCLUDE_WORDS & set(words + note):
+            if EXCLUDE_WORDS & {w.strip("()[],;:") for w in words + note}:
                 raise DpError(f"{key} \"{e}\": write exclusions as separate entries `!<path>`, not as text "
                               f"(e.g. --dont-touch src/api/ --dont-touch '!src/api/a.py')")
     dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
