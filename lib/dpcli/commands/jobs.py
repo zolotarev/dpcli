@@ -210,14 +210,17 @@ def job_stop(name):
 
 
 def cmd_job(a):
-    a.name = qualify(a.name)
+    short_name, a.name = a.name, qualify(a.name)
+    if a.action != "start" and a.name != short_name and not job_files(a.name)[0].exists() \
+            and job_files(short_name)[0].exists():
+        a.name = short_name  # a job started before names became per copy
     pidf, log, rcf = job_files(a.name) if a.name else (None, None, None)
     if a.action == "start":
         if not a.cmd or a.timeout is None:
             raise DpError(f"{CLI} job start <name> <timeout_s> <command…>")
         cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd
         if a.lock:
-            cmd = [*reexec.self_cmd(), "lock", a.lock, a.name, "--", *cmd]
+            cmd = [*reexec.self_cmd(), "lock", a.lock, short_name, "--", *cmd]
         job_start(a.name, a.timeout, cmd, tmux_opts(a))
         return
     if a.action == "status" and not a.name:
@@ -319,7 +322,8 @@ def cmd_lock(a):
     args = list(a.args)
     if args[:1] == ["status"]:
         return lock_status()
-    usage = f"{CLI} lock cpu|gpu <name> [--timeout SEC] [--tmux [--tmux-session S]] -- <command…>  |  {CLI} lock status"
+    usage = (f"{CLI} lock cpu|gpu <name> [--timeout SEC] [--tmux [--tmux-session S]] -- <command…>  (foreground by default; "
+             f"--no-tmux is accepted)  |  {CLI} lock status")
     if "--" not in args or len(args) < 4 or args[0] not in ("cpu", "gpu"):
         raise DpError(usage)
     k = args.index("--")
@@ -354,10 +358,11 @@ def cmd_lock(a):
     ip = Path(str(lp) + ".info")
     ip.write_text(json.dumps({"holder": holder, "pid": os.getpid(), "cmd": " ".join(cmd)[:200], "since": now(), "cwd": os.getcwd()}))
     if tm and re.fullmatch(r"[\w.-]+", holder):  # command runs in a tmux window, the lock stays here; wait by PID, code from .rc
-        job_start(holder, 0, cmd, tm)
-        pidf, _, rcf = job_files(holder)
+        jname = qualify(holder)  # the same per-copy name `job wait|stop <holder>` looks up
+        job_start(jname, 0, cmd, tm)
+        pidf, _, rcf = job_files(jname)
         for sg in (signal.SIGTERM, signal.SIGINT):
-            signal.signal(sg, lambda sig, _: job_stop(holder))
+            signal.signal(sg, lambda sig, _: job_stop(jname))
         try:
             pid = int(pidf.read_text())
             while job_alive(pid):

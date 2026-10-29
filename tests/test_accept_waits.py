@@ -30,8 +30,16 @@ class AcceptWithoutWaits(unittest.TestCase):
         self.assertIn("PASS slow", self.p.ok("accept", "AA-1", "--dry", "--fg"))
 
     def test_lock_runs_in_foreground_with_output(self):
-        out = self.p.ok("lock", "cpu", "t", "--", "echo", "hello-from-lock", env={"DPCLI_NO_TMUX": ""})
+        import os
+        bin_ = self.p.tmp / "faketmux"
+        bin_.mkdir()
+        log = self.p.tmp / "tmux.log"
+        (bin_ / "tmux").write_text(f"#!/bin/sh\necho \"$@\" >> {log}\nexit 0\n")  # tmux "available": old code used it
+        (bin_ / "tmux").chmod(0o755)
+        env = {"DPCLI_NO_TMUX": "", "PATH": f"{bin_}:{os.environ['PATH']}"}
+        out = self.p.ok("lock", "cpu", "t", "--", "echo", "hello-from-lock", env=env)
         self.assertIn("hello-from-lock", out)
+        self.assertFalse(log.exists(), "lock must not open a tmux window without --tmux")
 
     def test_job_names_are_per_copy(self):
         copy = self.p.copies / "other"
@@ -42,6 +50,15 @@ class AcceptWithoutWaits(unittest.TestCase):
         self.p.ok("job", "wait", "acc", "30", cwd=copy)
         status = self.p.ok("job", "status", "--all")
         self.assertEqual(status.count("acc:"), 2, status)
+
+    def test_job_start_under_lock_and_legacy_names(self):
+        self.p.ok("job", "start", "lk", "30", "--lock", "cpu", "--", "echo", "locked-run")
+        self.assertIn("locked-run", self.p.ok("job", "wait", "lk", "30"))
+        jobs = self.p.cache / "jobs"
+        (jobs / "old.pid").write_text("1")  # started before names became per copy
+        (jobs / "old.rc").write_text("0")
+        (jobs / "old.log").write_text("legacy\n")
+        self.assertIn("legacy", self.p.ok("job", "wait", "old", "5"))
 
 
 if __name__ == "__main__":
