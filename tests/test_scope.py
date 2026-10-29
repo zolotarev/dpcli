@@ -83,9 +83,6 @@ class HonestScope(unittest.TestCase):
         self.assertIn("tests/test_billing_totals.py", out)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class StashWarning(unittest.TestCase):
     def test_accept_warns_about_a_shared_stash(self):
@@ -98,3 +95,7 @@ class StashWarning(unittest.TestCase):
         git("stash", "-q", cwd=p.root)
         code, out, err = p.run("accept", "AA-1", "--dry")
         self.assertIn("git stash", out + err)
+
+
+if __name__ == "__main__":
+    unittest.main()
