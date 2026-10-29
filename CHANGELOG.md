@@ -1,5 +1,9 @@
 # Changelog
 
+## 27
+- `module new` tells dpcli branches by the journal (module branches, task card branches), not by the `module_branch` / `task_branch` templates: a feature branch like `feature/x` or `a/b` is a valid base again.
+- `accept` estimates check durations from the task's journal (`durs`) when this copy has no `results.json` — `accept --here` in the module copy goes to the background like in the task copy.
+
 ## 26
 - `feedback`: a report's `dp_feedback` given as a list is read as one friction per entry (was a TypeError for the whole ledger).
 
