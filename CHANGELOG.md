@@ -1,5 +1,8 @@
 # Changelog
 
+## 14
+- `install.sh`: no longer fails with `mv: cannot stat '.dpcli'` when `.dpcli` is recorded as a submodule without a `.gitmodules` entry (now registered and checked out) or when a vendored copy is tracked but deleted from disk (restored from the index first).
+
 ## 13
 - Process description (`workflow.md`) trimmed by ~110 tokens more: duplicated and decorative phrases removed, no rule changed.
 

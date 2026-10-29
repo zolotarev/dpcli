@@ -41,7 +41,19 @@ ask LANG_COMMITS "Language of commit messages" en
 if git config -f .gitmodules --get submodule..dpcli.path >/dev/null 2>&1; then
   git submodule update --init .dpcli
   say "submodule .dpcli present"
+elif git ls-files -s .dpcli | grep -q '^160000'; then
+  # recorded as a submodule but missing from .gitmodules (or never initialized): register it and check it out
+  git config -f .gitmodules submodule..dpcli.path .dpcli
+  git config -f .gitmodules submodule..dpcli.url "$REPO"
+  git add .gitmodules
+  if ! git submodule update --init .dpcli 2>/dev/null; then
+    git rm -q --cached .dpcli; rm -rf .dpcli
+    git submodule add -q --force "$REPO" .dpcli
+  fi
+  say "submodule .dpcli registered from $REPO"
 elif [ -n "$(git ls-files .dpcli | head -1)" ]; then
+  # vendored copy; deleted from disk — restore it from the index first so own agents can be carried over
+  [ -d .dpcli ] || git checkout -q -- .dpcli
   backup="$(git rev-parse --git-dir)/dpcli-vendored-$(date +%Y%m%d%H%M%S)"
   mv .dpcli "$backup"
   git rm -r -q --cached .dpcli
