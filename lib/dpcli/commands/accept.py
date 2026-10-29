@@ -179,7 +179,7 @@ def path_in(path, pats):
             and not any(_hit(path, p[1:]) for p in pats if p.startswith("!")))
 
 
-EXCLUDE_WORDS = {"кроме", "except", "excluding", "but", "без"}
+EXCLUDE_WORDS = {"кроме", "except", "excluding"}  # unambiguous only: notes like "(but only f())" are fine
 
 
 def check_bounds(card):
@@ -239,8 +239,10 @@ def scope_check(card, cwd, mod):
     dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
     out = [f for f in files if not path_in(f, scope)]
     bad = [f for f in files if path_in(f, dont)]
+    merges = gitx.git("rev-list", "--count", "--merges", "--first-parent", f"{base}..HEAD", cwd=cwd)
+    note = f" ({merges} merge commit(s): conflict resolutions not checked)" if merges not in ("", "0") else ""
     if not out and not bad:
-        return True, f"{len(files)} file(s) within bounds"
+        return True, f"{len(files)} file(s) within bounds{note}"
     parts = []
     if out:
         parts.append("outside scope: " + ", ".join(out[:10]) + (f" … (+{len(out) - 10})" if len(out) > 10 else ""))

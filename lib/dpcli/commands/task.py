@@ -5,8 +5,9 @@ import sys
 from pathlib import Path
 
 from .. import agents, config, copies, gitx
-from ..journal import (home_root, ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg,
+from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg, home_root,
                        find_task, module_home, module_meta, reserved_codes, task_cards)
+from .accept import check_bounds
 from ..util import CLI, DpError, Parser, hm, lang_commit, now, pretty, read_json, read_jsonl, rel, short, subgroup, write_json
 
 CARD_TEMPLATE = {
@@ -72,7 +73,6 @@ def cmd_task_new(a):
                       f"agents in {config.get('agents_dir')}/*.md, dpcli_role: executor)")
     validate_checks(card.get("accept"))
     check_plan_ref(a.module, card.get("plan_ref"))
-    from .accept import check_bounds
     check_bounds(card)
     ensure_module(a.module, home)
     card["created"] = card.get("created") or now()
@@ -279,7 +279,6 @@ def cmd_task_set(a):
         changed.append(f"accept:{f}")
     validate_checks(card.get("accept"))
     if {"scope", "dont_touch"} & set(changed):
-        from .accept import check_bounds
         check_bounds(card)
     if "plan_ref" in changed:
         check_plan_ref(mod, card.get("plan_ref"))
