@@ -134,7 +134,7 @@ def run_check(c, cwd, logdir, idx, tid):
     t0 = time.time()
     try:
         r = subprocess.run(["bash", "-c", cmd], cwd=wd, env=env, capture_output=True, text=True,
-                           timeout=c.get("timeout", 900))
+                           stdin=subprocess.DEVNULL, timeout=c.get("timeout", 900))  # `prettier --check` without files reads stdin
         code, out = r.returncode, r.stdout + ("\n" + r.stderr if r.stderr else "")
     except subprocess.TimeoutExpired as e:
         code, out = 124, (e.stdout or b"").decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")

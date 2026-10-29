@@ -1,5 +1,8 @@
 # Changelog
 
+## 25
+- `accept`: checks run with stdin from `/dev/null` — a formatter called without files (`prettier --check`) waited on the agent's open stdin until the check timeout.
+
 ## 24
 - `stats --tokens`: context tokens spent by executors, reviewers and coordinators per module, and per task, read from Claude Code's subagent logs (an agent is attributed by its first message — the dpcli brief). Lets a process change be checked by numbers.
 
