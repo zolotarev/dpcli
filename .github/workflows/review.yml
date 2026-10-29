@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
   issues: write
   id-token: write
-  actions: read
+  actions: write  # tools/decide.py approves test runs waiting for approval
   checks: read
 jobs:
   review:
