@@ -105,6 +105,10 @@ class Contribute(unittest.TestCase):
         code, _, err = self.p.run("contribute", "F-1", env=self.env)
         self.assertEqual(code, 1)
         self.assertIn("improve/", err)
+        git("switch", "-q", "-c", "improve/F-10-other", cwd=self.dist)  # another cluster's branch: its commits, not F-1's
+        code, _, err = self.p.run("contribute", "F-1", env=self.env)
+        self.assertEqual(code, 1)
+        self.assertIn("improve/F-1-", err)
 
     def test_no_gh_writes_patch(self):
         self.improve()
