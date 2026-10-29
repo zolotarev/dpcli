@@ -165,27 +165,56 @@ def _pat(entry):
     return [x for x in dict.fromkeys([head, first]) if x]
 
 
+def _hit(path, pat):
+    if any(ch in pat for ch in "*?["):
+        return fnmatch.fnmatch(path, pat) or fnmatch.fnmatch(path, pat.replace("**/", ""))
+    p = pat.rstrip("/").removeprefix("./")
+    return path == p or path.startswith(p + "/")
+
+
 def path_in(path, pats):
-    """Path matches a pattern: glob (* ? [, ** = any directories) or a file/directory prefix."""
-    for pat in pats:
-        if not pat:
-            continue
-        if any(ch in pat for ch in "*?["):
-            if fnmatch.fnmatch(path, pat) or fnmatch.fnmatch(path, pat.replace("**/", "")):
-                return True
-        else:
-            p = pat.rstrip("/").removeprefix("./")
-            if path == p or path.startswith(p + "/"):
-                return True
-    return False
+    """Path matches a pattern (glob: * ? [, ** = any directories; or a file/directory prefix) and no `!pattern`."""
+    pats = [p for p in pats if p]
+    return (any(_hit(path, p) for p in pats if not p.startswith("!"))
+            and not any(_hit(path, p[1:]) for p in pats if p.startswith("!")))
+
+
+EXCLUDE_WORDS = {"кроме", "except", "excluding"}  # unambiguous only: notes like "(but only f())" are fine
+
+
+def check_bounds(card):
+    """scope/dont_touch are paths or globs; exclusions are `!pattern` entries, not prose; scope must not lie inside
+    dont_touch — both made accept fail on files the card itself requires. Prose is detected by an exclusion word
+    after the first word of the path part or at the start of a note (so `docs/My notes except.md` needs backticks)."""
+    for key in ("scope", "dont_touch"):
+        for e in card.get(key) or []:
+            if str(e).lstrip().startswith("`"):
+                continue  # `a path with spaces` — the path is explicit
+            m = _NOTE.search(str(e))  # the path part, and a note that *starts* with an exception ("(except a.py)")
+            words = (str(e)[:m.start()] if m else str(e)).lower().split()[1:]
+            note = str(e)[m.end():].strip(" (").lower().split()[:1] if m else []
+            if EXCLUDE_WORDS & {w.strip("()[],;:") for w in words + note}:
+                raise DpError(f"{key} \"{e}\": write exclusions as separate entries `!<path>`, not as text "
+                              f"(e.g. --dont-touch src/api/ --dont-touch '!src/api/a.py'); an old entry: remove it with "
+                              f"task set <ID> '{key}-={e}'")
+    dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
+    for e in card.get("scope") or []:
+        for s in _pat(e):
+            fixed = re.split(r"[*?\[]", s)[0].rsplit("/", 1)[0] if any(ch in s for ch in "*?[") else s  # glob's fixed dir
+            if s and not s.startswith("!") and fixed and f"!{s}" not in dont and path_in(fixed.rstrip("/"), dont):
+                raise DpError(f"scope \"{s}\" lies inside dont_touch: add --dont-touch '!{s}' or narrow dont_touch")
 
 
 def changed_files(cwd, base):
-    """Files changed on the branch vs base (base...HEAD) plus uncommitted (incl. untracked)."""
-    r = gitx.gitr("-c", "core.quotepath=off", "diff", "--name-only", "-z", f"{base}...HEAD", cwd=cwd)
-    if r.returncode:
-        raise DpError(f"git diff {base}...HEAD: {gitx.gerr(r)}")
-    files = set(r.stdout.split("\0"))
+    """Net changes of the branch (base...HEAD) made by its own commits, plus uncommitted (incl. untracked).
+    Files only brought in by merges are not the task's work; a file added and reverted is no change. Accepted
+    limitation: edits made while resolving a merge, or work merged from a sub-branch, are not checked."""
+    q = ("-c", "core.quotepath=off")
+    net = gitx.gitr(*q, "diff", "--name-only", "-z", f"{base}...HEAD", cwd=cwd)
+    own = gitx.gitr(*q, "log", "--first-parent", "--no-merges", "--format=", "--name-only", "-z", f"{base}..HEAD", cwd=cwd)
+    if net.returncode or own.returncode:
+        raise DpError(f"git diff/log {base}...HEAD: {gitx.gerr(net if net.returncode else own)}")
+    files = set(net.stdout.split("\0")) & {f.strip("\n") for f in own.stdout.split("\0")}
     files.update(f for _xy, f in gitx.status_entries(cwd, "--untracked-files=all"))
     return sorted(f for f in files if f)
 
@@ -213,14 +242,16 @@ def scope_check(card, cwd, mod):
     dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
     out = [f for f in files if not path_in(f, scope)]
     bad = [f for f in files if path_in(f, dont)]
+    merges = gitx.git("rev-list", "--count", "--merges", "--first-parent", f"{base}..HEAD", cwd=cwd)
+    note = f" ({merges} merge commit(s): conflict resolutions not checked)" if merges not in ("", "0") else ""
     if not out and not bad:
-        return True, f"{len(files)} file(s) within bounds"
+        return True, f"{len(files)} file(s) within bounds{note}"
     parts = []
     if out:
         parts.append("outside scope: " + ", ".join(out[:10]) + (f" … (+{len(out) - 10})" if len(out) > 10 else ""))
     if bad:
         parts.append("in dont_touch: " + ", ".join(bad[:10]) + (f" … (+{len(bad) - 10})" if len(bad) > 10 else ""))
-    return False, "; ".join(parts)
+    return False, "; ".join(parts) + note
 
 
 def accept_bg(a, cwd, logdir):

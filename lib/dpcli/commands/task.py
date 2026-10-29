@@ -5,8 +5,9 @@ import sys
 from pathlib import Path
 
 from .. import agents, config, copies, gitx
-from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg,
+from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg, home_root,
                        find_task, module_home, module_meta, reserved_codes, task_cards)
+from .accept import check_bounds
 from ..util import CLI, DpError, Parser, hm, lang_commit, now, pretty, read_json, read_jsonl, rel, short, subgroup, write_json
 
 CARD_TEMPLATE = {
@@ -72,6 +73,7 @@ def cmd_task_new(a):
                       f"agents in {config.get('agents_dir')}/*.md, dpcli_role: executor)")
     validate_checks(card.get("accept"))
     check_plan_ref(a.module, card.get("plan_ref"))
+    check_bounds(card)
     ensure_module(a.module, home)
     card["created"] = card.get("created") or now()
     write_json(p, card)
@@ -79,6 +81,10 @@ def cmd_task_new(a):
     empty = missing_for_brief(card)
     print(f"{a.id}: {rel(p)}" + (f"; empty: {', '.join(empty)} — brief will refuse (fill in: {CLI} task set {a.id} …)"
                                   if empty else ""))
+    hint = related_tests(card, home_root(home))
+    if hint:
+        print(f"tests referencing scope files — add those the change will touch ({CLI} task set {a.id} scope+=PATH): "
+              + ", ".join(hint))
     if not a.no_copy:
         print(make_copy(card))
 
@@ -100,6 +106,20 @@ def check_plan_ref(mod, ref):
         return
     if path.is_file() and find_section(headings(path.read_text())[1], ref) is None:
         raise DpError(f"plan_ref \"{ref}\" is not a section of {rel(path)} (sections: {CLI} plan {mod})")
+
+
+def related_tests(card, cwd, limit=6):
+    """Test files that mention a scope file's name: the change will likely touch them, so they belong in the scope.
+    A heuristic (name match, paths containing test/spec), printed as a hint only."""
+    from .accept import _pat, path_in
+    pats = [p for e in card.get("scope") or [] for p in _pat(e)]
+    stems = {Path(p).stem for p in pats if p and not p.startswith("!") and not any(c in p for c in "*?[")
+             and len(Path(p).stem) >= 4 and Path(p).suffix}
+    if not stems:
+        return []
+    args = ["grep", "-l", "-w", "-F"] + [x for s in sorted(stems) for x in ("-e", s)] + ["--", "*test*", "*spec*"]
+    found = [f for f in gitx.git(*args, cwd=cwd).splitlines() if f and not path_in(f, pats)]
+    return found[:limit] + ([f"… (+{len(found) - limit})"] if len(found) > limit else [])
 
 
 def validate_checks(checks):
@@ -258,6 +278,8 @@ def cmd_task_set(a):
         acc[:] = [c for c in acc if c.get("name") != f] + [{"name": f, "tests": f}]
         changed.append(f"accept:{f}")
     validate_checks(card.get("accept"))
+    if {"scope", "dont_touch"} & set(changed):
+        check_bounds(card)
     if "plan_ref" in changed:
         check_plan_ref(mod, card.get("plan_ref"))
     if not changed:
