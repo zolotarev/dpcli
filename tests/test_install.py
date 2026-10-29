@@ -83,6 +83,16 @@ class Install(unittest.TestCase):
         self.assertTrue((r / ".dpcli" / "dpcli").is_file())
         self.assertIn(".dpcli", (r / ".gitmodules").read_text())
 
+    def test_gitlink_to_unknown_commit_is_re_added(self):
+        self.drop_vendored()
+        r = self.p.root
+        git("update-index", "--add", "--cacheinfo", f"160000,{'1' * 40},.dpcli", cwd=r)  # commit the hub doesn't have
+        git("commit", "-q", "-m", "stale submodule", cwd=r)
+        out = self.install("--lang", "en", "--commit-lang", "en")
+        self.assertIn("registered", out)
+        self.assertTrue((r / ".dpcli" / "dpcli").is_file())
+        self.assertNotIn("1" * 40, git("ls-files", "-s", ".dpcli", cwd=r))
+
 
 if __name__ == "__main__":
     unittest.main()
