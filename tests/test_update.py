@@ -87,6 +87,23 @@ class Update(unittest.TestCase):
         self.assertTrue((self.p.root / ".claude" / "dpcli-workflow.md").is_file())
         self.assertEqual(git("status", "--porcelain", "--", ".claude", cwd=self.p.root), "")
 
+    def test_hand_edited_generated_file_is_reported_not_rerendered_in_a_loop(self):
+        f = self.p.root / ".claude" / "agents" / "dp-engineer.md"
+        f.write_text(f.read_text() + "\nhand edit\n")
+        self.p.commit_all("hand edit")
+        out = self.p.ok("update", env=self.env)
+        self.assertIn("stays stale after init", out)
+        self.assertIn("hand edit", f.read_text())  # init never overwrites a hand edit
+
+    def test_init_failure_at_current_version_is_reported_with_its_cause(self):
+        (self.p.root / ".claude" / "dpcli-workflow.md").unlink()
+        bad = self.p.root / ".dpcli-local" / "agents" / "dp-broken.md"
+        bad.write_text("---\nname: dp-broken\ndpcli_role: nonsense\n---\nx\n")
+        self.p.commit_all("broken local agent")
+        out = self.p.ok("update", env=self.env)
+        self.assertIn("init failed", out)
+        self.assertIn("dpcli_role", out)
+
     def test_skips_dirty_and_improve_branch(self):
         self.release(self.v0 + 1)
         (self.p.root / ".dpcli" / "x.txt").write_text("wip")

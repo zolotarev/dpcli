@@ -86,11 +86,12 @@ def update_dist(a):
     if not cand or cand[-1] <= VERSION:
         if not a.check and run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
             # the version is current but .claude/ is not (dpcli changed in place, or init never ran): re-render
-            h = render_and_commit(root, f"dpcli v{VERSION}")
-            if h is not None and run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
+            h, err = render_and_commit(root, f"dpcli v{VERSION}")
+            if err:
+                return [f"dpcli v{VERSION}: .claude is stale and init failed — fix and run {CLI} init: {err}"]
+            if run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
                 return [f"dpcli v{VERSION}: .claude stays stale after init (edited by hand?) — see {CLI} init --check"]
-            if h is not None:
-                return [f"dpcli v{VERSION}: .claude re-rendered" + (f", committed {h}" if h else "")]
+            return [f"dpcli v{VERSION}: .claude re-rendered" + (f", committed {h}" if h else "")]
         return [f"dpcli v{VERSION} is up to date" + (f" (pinned v{pin})" if pin else "")] if not a.auto else []
     target = cand[-1]
     if a.check:
@@ -98,23 +99,24 @@ def update_dist(a):
     r = run("git", "checkout", "-q", f"v{target}", cwd=dist)
     if r.returncode:
         return [f"update: checkout v{target} failed: {r.stderr.strip()}"]
-    h = render_and_commit(root, f"dpcli v{target}")
-    if h is None:
-        return [f"update: v{target} checked out, but init failed — fix and run {CLI} init"]
+    h, err = render_and_commit(root, f"dpcli v{target}")
+    if err:
+        return [f"update: v{target} checked out, but init failed — fix and run {CLI} init: {err}"]
     notes = changelog(dist, f"v{target}", VERSION, target)
     return [f"dpcli v{VERSION} → v{target}" + (f", committed {h}" if h else "")] + [f"  {x}" for x in notes]
 
 
 def render_and_commit(root, msg):
-    """init + commit of the generated files. -> commit hash, "" when nothing changed, None when init failed."""
-    if run(sys.executable, str(reexec.entry()), "init", cwd=root).returncode:
-        return None
+    """init + commit of the generated files. -> (commit hash or "" when nothing changed, None | init's error)."""
+    r = run(sys.executable, str(reexec.entry()), "init", cwd=root)
+    if r.returncode:
+        return "", short((r.stderr or r.stdout).strip(), 200) or f"exit {r.returncode}"
     wf = config.repo_path(config.get("workflow"), root=root).resolve()
     extra = [str(wf.relative_to(root.resolve()))] if root.resolve() in wf.parents else []  # outside the repo: not ours to commit
     paths = [p for p in GENERATED + extra if (root / p).exists()]
     if run("git", "status", "--porcelain", "--", *paths, cwd=root).stdout.strip():
-        return gitx.commit_paths(root, paths, lang_commit(msg, msg))
-    return ""
+        return gitx.commit_paths(root, paths, lang_commit(msg, msg)), None
+    return "", None
 
 
 def check_prs():
