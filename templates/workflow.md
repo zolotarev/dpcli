@@ -38,7 +38,7 @@ Agents send only these formats.
 ## Task card — boundaries
 The coordinator writes it so the executor has nothing to search for:
 - `goal` — 1–2 sentences, what must come out;
-- `scope` — files/dirs that change; `dont_touch` — where there is temptation or risk;
+- `scope` — files/dirs that change; `dont_touch` — where there is temptation or risk; paths or globs only, exceptions as `!path`;
 - `accept` checks: `--test <filter>` or `--check <name> "<cmd>" "<expect>"` — executable, with thresholds;
 - interface contracts with versions (`--contract <name>@<version>`);
 - how to do it when not obvious — `task note` (files, functions, format, GPU/CPU lock, where data is).

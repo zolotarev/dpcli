@@ -165,27 +165,46 @@ def _pat(entry):
     return [x for x in dict.fromkeys([head, first]) if x]
 
 
+def _hit(path, pat):
+    if any(ch in pat for ch in "*?["):
+        return fnmatch.fnmatch(path, pat) or fnmatch.fnmatch(path, pat.replace("**/", ""))
+    p = pat.rstrip("/").removeprefix("./")
+    return path == p or path.startswith(p + "/")
+
+
 def path_in(path, pats):
-    """Path matches a pattern: glob (* ? [, ** = any directories) or a file/directory prefix."""
-    for pat in pats:
-        if not pat:
-            continue
-        if any(ch in pat for ch in "*?["):
-            if fnmatch.fnmatch(path, pat) or fnmatch.fnmatch(path, pat.replace("**/", "")):
-                return True
-        else:
-            p = pat.rstrip("/").removeprefix("./")
-            if path == p or path.startswith(p + "/"):
-                return True
-    return False
+    """Path matches a pattern (glob: * ? [, ** = any directories; or a file/directory prefix) and no `!pattern`."""
+    pats = [p for p in pats if p]
+    return (any(_hit(path, p) for p in pats if not p.startswith("!"))
+            and not any(_hit(path, p[1:]) for p in pats if p.startswith("!")))
+
+
+EXCLUDE_WORDS = re.compile(r"(?<!\w)(кроме|except|excluding|but not|без)(?!\w)", re.I)
+
+
+def check_bounds(card):
+    """scope/dont_touch are paths or globs; exclusions are `!pattern` entries, not prose; scope must not lie inside
+    dont_touch — both made accept fail on files the card itself requires."""
+    for key in ("scope", "dont_touch"):
+        for e in card.get(key) or []:
+            if EXCLUDE_WORDS.search(str(e)):
+                raise DpError(f"{key} \"{e}\": write exclusions as separate entries `!<path>`, not as text "
+                              f"(e.g. --dont-touch src/api/ --dont-touch '!src/api/a.py')")
+    dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
+    for e in card.get("scope") or []:
+        for s in _pat(e):
+            if s and not s.startswith("!") and not any(ch in s for ch in "*?[") and path_in(s.rstrip("/"), dont):
+                raise DpError(f"scope \"{s}\" lies inside dont_touch: add --dont-touch '!{s}' or narrow dont_touch")
 
 
 def changed_files(cwd, base):
-    """Files changed on the branch vs base (base...HEAD) plus uncommitted (incl. untracked)."""
-    r = gitx.gitr("-c", "core.quotepath=off", "diff", "--name-only", "-z", f"{base}...HEAD", cwd=cwd)
+    """Files changed by the branch's own commits (merges excluded: files they bring are not the task's work)
+    plus uncommitted (incl. untracked)."""
+    r = gitx.gitr("-c", "core.quotepath=off", "log", "--first-parent", "--no-merges", "--format=", "--name-only", "-z", f"{base}..HEAD",
+                  cwd=cwd)
     if r.returncode:
-        raise DpError(f"git diff {base}...HEAD: {gitx.gerr(r)}")
-    files = set(r.stdout.split("\0"))
+        raise DpError(f"git log {base}..HEAD: {gitx.gerr(r)}")
+    files = {f.strip("\n") for f in r.stdout.split("\0")}
     files.update(f for _xy, f in gitx.status_entries(cwd, "--untracked-files=all"))
     return sorted(f for f in files if f)
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 16
+- Scope checks no longer fail on files the card itself requires (25 reports): exclusions are `!pattern` entries in `scope`/`dont_touch`; prose like "src/api/ except a.py" is rejected at `task new`/`task set`; a scope path inside `dont_touch` is rejected there too (it always failed at `accept`); files brought into the task branch by merges no longer count — only the branch's own commits (`--first-parent --no-merges`); `task new` lists test files that mention scope files so they can be added up front.
+
 ## 15
 - `plan <m> <section>`: a section of several words needs no quotes; `5. Tasks / DS-0` and `4. Tasks (PF-5)` find the section by their most specific part; a card's `plan_ref` is checked at `task new` / `task set` (19 reports: "section from the card not found").
 - `report <ID>` reads the per-task file `<log_dir>/<ID>/report.json` by default (brief and `task show` name it) and rejects a report whose `id` is another task's (13 reports: parallel agents overwrote a shared `/tmp/r.json`); a report without `id` is still accepted (old reports); explicit input (`FILE`, `< FILE`, `-` for a pipe) beats a stale per-task file; a pipe now needs `-` (an idle pipe in agent shells used to block); a report without `id` read from a file gets a warning.
