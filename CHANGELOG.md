@@ -1,5 +1,8 @@
 # Changelog
 
+## 19
+- `accept` warns when `git stash` is not empty: the stash is shared by all worktrees, and a pop in one copy took another task's changes (6 reports; the rule alone did not stop it).
+
 ## 18
 - `task show` prints the "General rules" section of the process description; executor and reviewer prompts point there instead of the whole file (≈460 instead of ≈3300 tokens per task).
 - A review stores the commit it looked at; after a rework `task brief --review` points the fresh reviewer to the previous issues and the diff since that commit only.

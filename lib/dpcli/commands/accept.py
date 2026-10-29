@@ -320,6 +320,10 @@ def cmd_accept(a):
     print(f"{'SKIP' if sc_ok is None else 'PASS' if sc_ok else 'FAIL'} {'scope':<{w}} {sc_val}")
     npass = sum(r[1] for r in res)
     allok = npass == len(res) and sc_ok is not False
+    stash = gitx.git("stash", "list", cwd=cwd).splitlines()
+    if stash:  # refs/stash is shared by all worktrees: a pop in one copy takes another task's changes
+        print(f"warning: git stash has {len(stash)} entr{'y' if len(stash) == 1 else 'ies'} shared by all copies — "
+              f"commit instead of stashing; check `git stash list` before any pop", file=sys.stderr)
     print(f"{a.id}: {npass}/{len(res)}{'' if sc_ok is not False else ' + FAIL scope'} in {rel(cwd)}"
           + ("" if allok else "; logs " + rel(logdir)))
     # summary over all card checks: latest result of each (for the copy's current HEAD)
