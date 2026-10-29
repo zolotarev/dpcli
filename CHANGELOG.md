@@ -1,5 +1,9 @@
 # Changelog
 
+## 23
+- `update` re-renders `.claude/` when the version is current but the generated files are not (`init --check`) — seen when the submodule was moved by hand; if they stay stale after `init` (edited by hand), it says so instead of re-rendering on every run.
+- `task new|set` rejects duplicate check names: results and logs are kept per name since v21.
+
 ## 22
 - A `PreToolUse` hook (installed by `init`, delivered by `update`) refuses editing project files through Bash and points the agent to Edit/Write; programs, reads and temporary files pass. In the first project agents made ≈1200 such edits and no Edit calls; the v20 rule alone was not expected to change that.
 

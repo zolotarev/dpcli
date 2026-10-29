@@ -84,6 +84,13 @@ def update_dist(a):
     pin = tag_num((read_json(pin_file()) or {}).get("pin") or "")
     cand = [n for n in tags if pin is None or n <= pin]
     if not cand or cand[-1] <= VERSION:
+        if not a.check and run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
+            # the version is current but .claude/ is not (dpcli changed in place, or init never ran): re-render
+            h = render_and_commit(root, f"dpcli v{VERSION}")
+            if h is not None and run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
+                return [f"dpcli v{VERSION}: .claude stays stale after init (edited by hand?) — see {CLI} init --check"]
+            if h is not None:
+                return [f"dpcli v{VERSION}: .claude re-rendered" + (f", committed {h}" if h else "")]
         return [f"dpcli v{VERSION} is up to date" + (f" (pinned v{pin})" if pin else "")] if not a.auto else []
     target = cand[-1]
     if a.check:
@@ -91,17 +98,23 @@ def update_dist(a):
     r = run("git", "checkout", "-q", f"v{target}", cwd=dist)
     if r.returncode:
         return [f"update: checkout v{target} failed: {r.stderr.strip()}"]
-    r = run(sys.executable, str(reexec.entry()), "init", cwd=root)
-    if r.returncode:
-        return [f"update: v{target} checked out, but init failed — fix and run {CLI} init: {short(r.stderr.strip(), 200)}"]
+    h = render_and_commit(root, f"dpcli v{target}")
+    if h is None:
+        return [f"update: v{target} checked out, but init failed — fix and run {CLI} init"]
+    notes = changelog(dist, f"v{target}", VERSION, target)
+    return [f"dpcli v{VERSION} → v{target}" + (f", committed {h}" if h else "")] + [f"  {x}" for x in notes]
+
+
+def render_and_commit(root, msg):
+    """init + commit of the generated files. -> commit hash, "" when nothing changed, None when init failed."""
+    if run(sys.executable, str(reexec.entry()), "init", cwd=root).returncode:
+        return None
     wf = config.repo_path(config.get("workflow"), root=root).resolve()
     extra = [str(wf.relative_to(root.resolve()))] if root.resolve() in wf.parents else []  # outside the repo: not ours to commit
     paths = [p for p in GENERATED + extra if (root / p).exists()]
-    h = ""
     if run("git", "status", "--porcelain", "--", *paths, cwd=root).stdout.strip():
-        h = gitx.commit_paths(root, paths, lang_commit(f"dpcli v{target}", f"dpcli v{target}"))
-    notes = changelog(dist, f"v{target}", VERSION, target)
-    return [f"dpcli v{VERSION} → v{target}" + (f", committed {h}" if h else "")] + [f"  {x}" for x in notes]
+        return gitx.commit_paths(root, paths, lang_commit(msg, msg))
+    return ""
 
 
 def check_prs():

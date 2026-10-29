@@ -79,6 +79,14 @@ class Update(unittest.TestCase):
         self.assertIn(f"dpcli v{n}", git("log", "-1", "--format=%s", cwd=self.p.root))
         self.assertIn("up to date", self.p.ok("update", env=self.env))
 
+    def test_current_version_but_stale_claude_is_rerendered(self):
+        (self.p.root / ".claude" / "dpcli-workflow.md").unlink()
+        self.p.commit_all("lost the rendered workflow")
+        out = self.p.ok("update", env=self.env)
+        self.assertIn(".claude re-rendered", out)
+        self.assertTrue((self.p.root / ".claude" / "dpcli-workflow.md").is_file())
+        self.assertEqual(git("status", "--porcelain", "--", ".claude", cwd=self.p.root), "")
+
     def test_skips_dirty_and_improve_branch(self):
         self.release(self.v0 + 1)
         (self.p.root / ".dpcli" / "x.txt").write_text("wip")
