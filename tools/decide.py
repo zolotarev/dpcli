@@ -3,6 +3,7 @@
 accept + green → squash-merge, tag vN, release; rework (or red tests) → label `rework`; reject → label and close.
 Runs from the base branch only (trusted code)."""
 import json
+import os
 import re
 import subprocess
 import sys
@@ -27,14 +28,21 @@ def label(pr, add, remove=()):
 
 def tests_state(pr, timeout=1800):
     """success | failure | missing: latest `test` run on the PR head commit, whatever started it
-    (pull_request, or workflow_dispatch for PRs opened by workflows — those are not PR checks)."""
+    (pull_request, or workflow_dispatch for PRs opened by workflows — those are not PR checks).
+    Runs waiting for approval (first-time contributors) are approved: `test` runs on pull_request
+    without secrets and with a read-only token (owner's decision: fully automatic hub)."""
     sha = json.loads(gh("pr", "view", pr, "--json", "headRefOid"))["headRefOid"]
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
     t0 = time.time()
     while True:
-        runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json", "status,conclusion",
-                             check=False) or "[]")
-        if runs and runs[0]["status"] == "completed":
-            return "success" if runs[0]["conclusion"] == "success" else "failure"
+        runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json",
+                             "databaseId,status,conclusion", check=False) or "[]")
+        for r in runs:
+            if r["status"] in ("waiting", "action_required") or r.get("conclusion") == "action_required":
+                gh("api", "-X", "POST", f"repos/{repo}/actions/runs/{r['databaseId']}/approve", check=False)
+        done = [r for r in runs if r["status"] == "completed" and r.get("conclusion") != "action_required"]
+        if done:
+            return "success" if done[0]["conclusion"] == "success" else "failure"
         if time.time() - t0 > timeout:
             return "missing" if not runs else "failure"
         time.sleep(30)
