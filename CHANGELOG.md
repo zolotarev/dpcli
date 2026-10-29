@@ -1,5 +1,10 @@
 # Changelog
 
+## 21
+- Reviewing work that lives in the main copy (a `--no-copy` card): `task brief` names the copy and branch where the work is instead of a copy that does not exist; `accept --here` checks the uncommitted changes against the scope instead of skipping it.
+- Check logs are named by the check (`<log_dir>/<ID>/<check>.log`): with `--only` or re-created checks, stale logs of the same check stayed next to fresh ones under other numbers.
+- `feedback --module/--since` lists only clusters that have frictions in that slice.
+
 ## 20
 - Process rule: files are read and edited with the Read, Edit and Write tools, Bash runs programs (`rg`, `fd`, `jq`, `ast-grep`) — executors had edited files almost only through `python3 -`/`sed -i`/`cat >` heredocs.
 - `install.sh --tools`: quiet non-interactive apt; a hint when `~/.local/bin` is not on PATH.

@@ -130,7 +130,7 @@ def run_check(c, cwd, logdir, idx, tid):
         wd = Path(cwd) / wd
     env = check_env(tid)
     safe = re.sub(r"[^\w.-]+", "_", name)
-    log = logdir / f"{idx:02d}-{safe}.log"
+    log = logdir / f"{safe}.log"  # by name: --only or a re-created check must not leave stale logs under other numbers
     t0 = time.time()
     try:
         r = subprocess.run(["bash", "-c", cmd], cwd=wd, env=env, capture_output=True, text=True,
@@ -226,10 +226,12 @@ def scope_check(card, cwd, mod):
         return None, "skipped: empty scope"
     br, base = card.get("branch"), card.get("base") or config.module_branch(mod)
     cur = gitx.git("branch", "--show-current", cwd=cwd)
-    if br and cur != br:
+    no_copy = not (card.get("copy") and Path(card["copy"]).expanduser().is_dir())
+    if br and cur != br and not no_copy:
         return None, f"skipped: {rel(cwd)} is not on task branch {br}"
-    try:
-        files = changed_files(cwd, base)
+    try:  # a --no-copy card's work is the uncommitted changes of the copy it runs in
+        files = sorted({f for _xy, f in gitx.status_entries(cwd, "--untracked-files=all")}) if br and cur != br \
+            else changed_files(cwd, base)
     except DpError as e:
         return False, str(e)
     skip = [f"{config.plan_dir()}/{mod}/", str(config.get("checks.log_dir") or "build/dpcli")]
