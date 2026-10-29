@@ -1,5 +1,8 @@
 # Changelog
 
+## 13
+- Process description (`workflow.md`) trimmed by ~95 tokens more: merged repeated lines, no rule changed.
+
 ## 12
 - Process description (`workflow.md`) trimmed by ~100 tokens: repeated and decorative phrases removed, no rule changed.
 

@@ -1,7 +1,6 @@
 # Working with agents — {{project}}
 
-Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). The process exists to save context: agents exchange IDs and commands, details live in the journal.
-
+Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`).
 **Language.** Everything written for people — replies to the user, reports, journal entries, plans, docs — in {{language_text}}. Commit messages in {{language_commits}}.
 
 ## Roles
@@ -31,14 +30,12 @@ Agents send only these formats; details are in the journal.
 | coordinator → main | `<m>: <n> accepted, <n> in progress; gate Q<n>` or `<m> done` |
 | main → user | free form, from `{{cli}} status` / `{{cli}} digest` |
 
-- User decisions are already in the inbox (via `decide`); don't retell them in messages.
 - Add nothing to `brief`: task specifics go into the card (`{{cli}} task note <ID> "…"`).
-- Don't retell the journal (report, review, status) — give the ID.
-- Missing information — ask in one line, don't read someone else's context.
-- New rules for a running agent — by message, no restart.
+- Don't retell the journal (report, review, status, user decisions) — give the ID.
+- Missing information — ask in one line. New rules for a running agent — by message, no restart.
 
 ## Task card — boundaries
-The coordinator writes it so the executor has nothing to search for:
+The coordinator writes it; the executor searches for nothing:
 - `goal` — 1–2 sentences, what must come out;
 - `scope` — files/dirs that change; `dont_touch` — where there is temptation or risk;
 - `accept` checks: `--test <filter>` or `--check <name> "<cmd>" "<expect>"` — executable, with thresholds;
@@ -68,13 +65,12 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Refer to decisions in plans, contracts and cards by `Q<n>` or date `YYYY-MM-DD`, not by time ("decision 12:35"): after delivery the journal with timestamps is not in the branch.
 - Deterministic work — `{{cli}}` commands (`search`, `plan`, `docs`, `log`, `status`, `task`, `sync/merge`); don't write your own grep/scripts over the journal, plans and docs. A command is missing — work around once and log feedback.
 - Agents do only what needs thought: design, find the cause, write code/text.
-- Correctness over "looks nice": parameters are justified (domain, measurements, sources); assumptions and limits go into the report.
-- Don't invent: numbers come from measurements, results from reports.
-- Don't polish: minor visual/style details — at most 2 attempts.
+- Correctness over "looks nice": parameters are justified (domain, measurements, sources); assumptions and limits go into the report. Numbers come from measurements, results from reports.
 - Fast tools: search — `rg`; files — `fd` or `rg --files`; JSON — `jq`; code structure — `ast-grep`; read a file with the Read tool (offset/limit), not `cat`/`sed -n`; Python beyond one line — a script file run with `uv run` or `python3 file.py`, not a long `python3 -` heredoc.
 - Tests — non-interactive. GPU — `{{cli}} lock gpu <name> -- <cmd>`, heavy CPU — `{{cli}} lock cpu …`.
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
 - Batches of runs — one script, one background run, results as a table.
+- Don't polish: minor visual/style details — at most 2 attempts.
 - Don't open images unless appearance is the subject of the task; verify with numbers. Artifacts — in `artifacts_dir`, a subfolder per task.
 - Read plans and contracts by section: `{{cli}} plan <m> <section>`, `--contracts <name>`.
 - Commits — only your own files: `git add <paths> && git commit -m "…" -- <paths>`, with a `Claude-Session` line; no push. Never `git stash`: the stash is shared by all worktrees.
@@ -84,13 +80,13 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only via commands, never edit by hand. It is the module branch's working journal: commit it there freely, it does not go into the target branch — `deliver` folds it into `decisions.md` (decisions, questions with answers) and `summary.md` (task results, not done, doubts). Full view for the coordinator — `{{cli}} render <m>`.
 - Task ID `<CODE>-<n>[letter]`; `task new <m>` without an ID takes the next number.
 - Executor: `{{cli}} task show <ID>` → work → `{{cli}} accept <ID> --dry` → `{{cli}} report <ID> < r.json` (schema `report --template`; `uncertain` — doubts and what was checked; `dp_feedback`). `report` is the only write into the module copy.
-- Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`; frictions — see "Self-improvement".
+- Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`.
 
 ## Documentation
 - Entry — `{{docs_dir}}/INDEX.md`. Find — `{{cli}} docs find <words>`, `{{cli}} docs findings <words>`, module journals — `{{cli}} search <text>` (`--sem` — by meaning, if enabled).
 - Read by section, not whole: `{{cli}} docs section <path>` — table of contents, `{{cli}} docs section <path> <number|heading start>` — a section.
 - Every md has frontmatter (`type`, `status`, `module`, `updated`, `summary`, `related`); new — `{{cli}} docs init`; `summary` — the conclusion/purpose in one line ≤ 140 chars (not TODO).
-- Document size ≤ `docs.max_kb` (40 KB): larger — split into section files or move data out; before commit — `{{cli}} docs check`, registries — `{{cli}} docs index`.
+- Document ≤ `docs.max_kb` (40 KB): larger — split or move data out; before commit — `{{cli}} docs check`, registries — `{{cli}} docs index`.
 - Finished work — one line in `registry/findings.md` (module section): the conclusion with numbers and a `path#section` link.
 
 ## Agents and models
@@ -120,11 +116,10 @@ Opus only if the task needs design that cannot be moved into the plan or a contr
 ## Sessions and context
 Every turn pays for the whole session context again.
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
-- With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
-- Subagents — only when needed (protocol, waves).
+- With a long context the main session does not touch code: a task for an executor or a fresh session.
 
 ## Self-improvement
-The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
+The process (agents, templates, rules, permissions, dpcli) changes only with the user's approval.
 - **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`. No status here.
 - **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 proposals to the user.
 - **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — never edited in place: a branch `improve/*` in `.dpcli` and `{{cli}} contribute F-n` (a PR to the dpcli hub or a +1 on a similar one); everyone gets it with the next update.
