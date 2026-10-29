@@ -44,9 +44,7 @@ class PlanSections(unittest.TestCase):
         for bad in ("7. Nowhere", "7. Nowhere (x)", "Goal (1)"):
             code, _, err = self.p.run(*args, "--plan-ref", bad)
             self.assertEqual(code, 1, bad)
-        code, _, err = self.p.run(*args, "--plan-ref", "7. Nowhere")
-        self.assertEqual(code, 1)
-        self.assertIn("plan_ref", err)
+            self.assertIn("plan_ref", err)
         self.p.ok(*args, "--plan-ref", "4. Tasks (PF-5)")
 
 
@@ -71,8 +69,20 @@ class ReportFile(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("no report file", err)
 
+    def test_explicit_input_beats_stale_task_file(self):
+        f = self.p.root / "build" / "dpcli" / "PF-1" / "report.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps({**report("PF-1"), "summary": "STALE"}))
+        fresh = self.p.root / "fresh.json"
+        fresh.write_text(json.dumps({**report("PF-1"), "summary": "FRESH"}))
+        with open(fresh) as stdin:
+            import subprocess, sys
+            subprocess.run([sys.executable, self.p.cli, "report", "PF-1"], cwd=self.p.root, env=self.p.env(),
+                           stdin=stdin, capture_output=True, check=True)
+        self.assertIn("FRESH", self.p.ok("report", "PF-1", "--show"))
+
     def test_report_of_another_task_rejected(self):
-        code, _, err = self.p.run("report", "PF-2", input=json.dumps(report("PF-1")))
+        code, _, err = self.p.run("report", "PF-2", "-", input=json.dumps(report("PF-1")))
         self.assertEqual(code, 1)
         self.assertIn("PF-1", err)
 

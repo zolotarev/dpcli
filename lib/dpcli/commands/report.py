@@ -13,14 +13,14 @@ VERDICTS = ("accept", "rework")
 MAX_ISSUES = 7
 
 
-def stdin_has_data():
-    """`< file` or a pipe with data; an idle open pipe (agent shells) must not block."""
-    import os, select, stat
+def stdin_redirected():
+    """`< file` only; pipes need an explicit `-` (an idle open pipe in agent shells must not block)."""
+    import os
+    import stat
     try:
-        mode = os.fstat(0).st_mode
+        return stat.S_ISREG(os.fstat(0).st_mode)
     except OSError:
         return False
-    return stat.S_ISREG(mode) or (stat.S_ISFIFO(mode) and bool(select.select([0], [], [], 0.2)[0]))
 
 
 def report_file(tid):
@@ -137,12 +137,14 @@ def cmd_report(a):
             L.append("dpcli: " + short(r["dp_feedback"], 200))
         print("\n".join(L))
         return
-    if a.file == "-" or (a.file is None and not report_file(a.id).is_file() and stdin_has_data()):
+    from_file = not (a.file == "-" or (a.file is None and stdin_redirected()))  # explicit input beats a stale file
+    if not from_file:
         src = sys.stdin.read()
     else:
         f = Path(a.file) if a.file else report_file(a.id)
         if not f.is_file():
-            raise DpError(f"no report file {rel(f)}: write it there ({CLI} report --template {a.id}), or pass FILE / stdin")
+            raise DpError(f"no report file {rel(f)}: write it there ({CLI} report --template {a.id}), or pass FILE, "
+                          f"`< FILE` or `- ` for a pipe")
         src = f.read_text()
     try:
         r = json.loads(src)
@@ -150,6 +152,8 @@ def cmd_report(a):
         raise DpError(f"report: invalid JSON ({e}); schema: {CLI} report --template")
     if isinstance(r, dict) and r.get("id") not in (None, "", a.id, "<task ID>"):
         raise DpError(f"this report is for {r['id']}, not {a.id} — a file shared with another agent? use {rel(report_file(a.id))}")
+    if from_file and isinstance(r, dict) and not r.get("id"):
+        print(f"dpcli: warning: the report has no \"id\" — make sure it is {a.id}'s", file=sys.stderr)
     errs = validate_report(r, card)
     if errs:
         raise DpError(f"{a.id}: report rejected: " + "; ".join(errs))

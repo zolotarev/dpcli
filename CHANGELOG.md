@@ -2,7 +2,7 @@
 
 ## 15
 - `plan <m> <section>`: a section of several words needs no quotes; `5. Tasks / DS-0` and `4. Tasks (PF-5)` find the section by their most specific part; a card's `plan_ref` is checked at `task new` / `task set` (19 reports: "section from the card not found").
-- `report <ID>` reads the per-task file `<log_dir>/<ID>/report.json` by default (brief and `task show` name it) and rejects a report whose `id` is another task's (13 reports: parallel agents overwrote a shared `/tmp/r.json`); a report without `id` is still accepted (old reports); stdin is read only when redirected or a pipe has data, so it never waits.
+- `report <ID>` reads the per-task file `<log_dir>/<ID>/report.json` by default (brief and `task show` name it) and rejects a report whose `id` is another task's (13 reports: parallel agents overwrote a shared `/tmp/r.json`); a report without `id` is still accepted (old reports); explicit input (`FILE`, `< FILE`, `-` for a pipe) beats a stale per-task file; a pipe now needs `-` (an idle pipe in agent shells used to block); a report without `id` read from a file gets a warning.
 
 ## 14
 - `install.sh`: no longer fails with `mv: cannot stat '.dpcli'` when `.dpcli` is recorded as a submodule without a `.gitmodules` entry (now registered and checked out) or when a vendored copy is tracked but deleted from disk (restored from the index first).
