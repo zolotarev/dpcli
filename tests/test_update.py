@@ -113,6 +113,32 @@ class Update(unittest.TestCase):
         self.assertIn("improve/F-1-x", self.p.ok("update", env=self.env))
         self.assertEqual(self.head_version(), self.v0)
 
+    def test_merged_pr_branch_is_dropped_and_update_goes_on(self):
+        self.release(self.v0 + 1)
+        d = self.p.root / ".dpcli"
+        for br in ("improve/F-1-x", "improve/F-1-more"):
+            git("switch", "-q", "-c", br, f"v{self.v0}", cwd=d)
+            (d / f"{br[-1]}.txt").write_text(br)
+            git("add", "-A", cwd=d)
+            git("commit", "-q", "-m", br, cwd=d)
+        git("switch", "-q", "improve/F-1-x", cwd=d)
+        head = git("rev-parse", "HEAD", cwd=d)
+        self.p.ok("feedback", "new", "Slow accept", "--match", "accept", "--scope", "dpcli")
+        with open(self.p.root / ".dpcli-local" / "feedback.jsonl", "a") as f:
+            f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-1", "kind": "pr", "url": "https://github.com/o/r/pull/1"}) + "\n")
+        bin_ = self.p.tmp / "bin"
+        bin_.mkdir()
+        (bin_ / "gh").write_text(FAKE_GH)
+        (bin_ / "gh").chmod(0o755)
+        env = {"PATH": f"{bin_}:{os.environ['PATH']}",
+               "FAKE_PR": json.dumps({"1": {"state": "MERGED", "labels": [], "comments": [], "headRefOid": head}})}
+        out = self.p.ok("update", env=env)
+        self.assertIn("removed improve/F-1-x", out)
+        self.assertEqual(self.head_version(), self.v0 + 1)  # no longer stuck on the improve branch
+        branches = git("branch", "--format=%(refname:short)", cwd=d)
+        self.assertNotIn("improve/F-1-x", branches)
+        self.assertIn("improve/F-1-more", branches)  # not the merged head: may hold unsent work
+
     def test_pin(self):
         self.release(self.v0 + 1)
         self.release(self.v0 + 2, "SECOND")

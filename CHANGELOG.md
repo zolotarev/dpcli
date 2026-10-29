@@ -1,7 +1,8 @@
 # Changelog
 
 ## 29
-- CLAUDE.md block: clean up after yourself — branches, copies, temp files and processes you made, once merged or unneeded (sessions left already-merged branches behind).
+- `update` removes a local `improve/F-n-…` branch once its PR is merged and the branch tip is the PR's head (a branch with other commits is kept); on such a branch it detaches and updates instead of skipping forever. Sessions left merged branches behind.
+- CLAUDE.md block: after a merge — `gc --remove` (merged copies and branches).
 
 ## 28
 - Hook `UserPromptSubmit` (`hooks/context_guard.py`, installed by `init`): when the main session's last turn is over `$DPCLI_CONTEXT_MAX` (300k) tokens, one line asks to finish the step and start a new session — a long main session re-reads its context on every turn and cost more than all the agents it ran.
