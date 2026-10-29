@@ -1,5 +1,8 @@
 # Changelog
 
+## 22
+- A `PreToolUse` hook (installed by `init`, delivered by `update`) refuses editing project files through Bash and points the agent to Edit/Write; programs, reads and temporary files pass. In the first project agents made ≈1200 such edits and no Edit calls; the v20 rule alone was not expected to change that.
+
 ## 21
 - Reviewing work that lives in the main copy (a `--no-copy` card): `task brief` names the copy and branch where the work is instead of a copy that does not exist; `accept --here` checks the uncommitted changes against the scope instead of skipping it.
 - Check logs are named by the check (`<log_dir>/<ID>/<check>.log`): with `--only` or re-created checks, stale logs of the same check stayed next to fresh ones under other numbers.
