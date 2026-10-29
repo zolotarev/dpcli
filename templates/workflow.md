@@ -28,7 +28,7 @@ Agents send only these formats.
 | coordinator → reviewer | output of `{{cli}} task brief <ID> --review` as is |
 | executor → coordinator | one line: `<ID> reported` \| `<ID> blocked: <reason ≤15 words>` \| `<ID> contract: <what to change>` |
 | reviewer → coordinator | `<ID> review accept` \| `<ID> review rework <n issues>` |
-| coordinator → main | `<m>: <n> accepted, <n> in progress; gate Q<n>` or `<m> done` |
+| coordinator → main | `<m>: <n> accepted, <n> in progress; gate Q<n>`, `<m>: wave <n> done` (main starts a fresh coordinator for the next wave) or `<m> done` |
 | main → user | free form, from `{{cli}} status` / `{{cli}} digest` |
 
 - User decisions are already in the inbox (via `decide`); don't retell them in messages.

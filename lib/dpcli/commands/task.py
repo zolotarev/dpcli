@@ -95,6 +95,22 @@ def _report_path(tid):
     return rel(report_file(tid))
 
 
+def general_rules():
+    """The "General rules" section of the process description, inline: executors need it, not the whole file
+    (~460 of ~3300 tokens)."""
+    from ..mdsec import find_section, headings, section_body
+    wf = config.get("workflow")
+    try:
+        path = config.repo_path(wf)
+        lines, heads = headings(path.read_text())
+    except (OSError, DpError):
+        return [f"Rules: {wf}, \"General rules\" (mandatory reading)."]
+    sel = find_section(heads, "General rules")
+    if sel is None:
+        return [f"Rules: {wf}, \"General rules\" (mandatory reading)."]
+    return [f"Rules ({wf}; other sections only when the card points to them):"] + section_body(lines, heads, sel)[1:]
+
+
 def check_plan_ref(mod, ref):
     """A card's plan_ref must name an existing plan section (when the plan file exists)."""
     if not ref:
@@ -199,8 +215,12 @@ def cmd_task_brief(a):
     tid, cp, br, base = card["id"], card.get("copy"), card.get("branch"), card.get("base")
     if a.review:
         L = [f"Review {tid}: copy {cp}, branch {br}.",
-             f"Data: {CLI} task show {tid} --full; {CLI} report {tid} --show.",
-             f"Verdict: {CLI} review {tid} --verdict accept|rework --from r.json (schema: --template).",
+             f"Data: {CLI} task show {tid} --full; {CLI} report {tid} --show."]
+        prev = read_json(home / "tasks" / f"{tid}.review.json") or {}
+        if prev.get("verdict") == "rework" and prev.get("head"):
+            L.append(f"Re-review: check that the previous issues are fixed ({CLI} review {tid} --show) and only what changed "
+                     f"since (git -C {cp} diff --stat {prev['head']}..HEAD); the rest was reviewed.")
+        L += [f"Verdict: {CLI} review {tid} --verdict accept|rework --from r.json (schema: --template).",
              f"Reply: «{tid} review accept|rework <n>»"]
     else:
         sect = card.get("plan_ref") or "<section>"
@@ -367,7 +387,7 @@ def cmd_task_show(a):
     nedit = sum(1 for e in read_jsonl(home / "events.jsonl") if e.get("task") == a.id and e.get("ev") == "edited")
     if nedit:
         L.append(f"Card edited {nedit} time(s) ({CLI} task show {a.id} --diff)")
-    L.append(f"Rules: {config.get('workflow')}, «General rules» (mandatory reading).")
+    L += general_rules()
     L.append(f"Neighbours' fresh work (branch {card.get('base') or 'module'} -> yours): {CLI} task sync {card['id']}.")
     L.append(f"Long runs: `{CLI} job start <name> <timeout_s> <command…>`, wait with `{CLI} job wait <name> <timeout_s>` "
              "in the background (run_in_background), not `until grep` loops.")

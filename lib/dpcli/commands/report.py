@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from .. import config
+from .. import config, gitx
 from ..journal import SEVERITY, add_event, by_default, count_sev, find_task, rev_tag
 from ..util import CLI, DpError, now, read_json, rel, short, write_json
 
@@ -261,6 +261,10 @@ def cmd_review(a):
         raise DpError(f"{a.id}: review rejected: " + "; ".join(errs))
     r["t"] = now()
     r["by"] = by_default(a)
+    card = read_json(home / "tasks" / f"{a.id}.json") or {}
+    cp = Path(card.get("copy") or "").expanduser()
+    if cp.is_dir():  # the next review of a rework looks only at what changed since this commit
+        r["head"] = gitx.git("rev-parse", "--short", "HEAD", cwd=cp)
     write_json(p, r)
     cnt = count_sev(r)
     ev = add_event(home, a.id, "reviewed", r["by"], note=short(r["summary"], 160), verdict=a.verdict,
