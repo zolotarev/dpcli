@@ -47,7 +47,7 @@ elif git ls-files -s .dpcli | grep -q '^160000'; then
   git config -f .gitmodules submodule..dpcli.url "$REPO"
   git add .gitmodules
   if ! git submodule update --init .dpcli 2>/dev/null; then
-    git rm -q --cached .dpcli; rm -rf .dpcli
+    git rm -q --cached .dpcli; rmdir .dpcli 2>/dev/null || true  # an empty uninitialized dir only
     git submodule add -q --force "$REPO" .dpcli
   fi
   say "submodule .dpcli registered from $REPO"
