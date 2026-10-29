@@ -1,5 +1,9 @@
 # Changelog
 
+## 20
+- Process rule: files are read and edited with the Read, Edit and Write tools, Bash runs programs (`rg`, `fd`, `jq`, `ast-grep`) — executors had edited files almost only through `python3 -`/`sed -i`/`cat >` heredocs.
+- `install.sh --tools`: quiet non-interactive apt; a hint when `~/.local/bin` is not on PATH.
+
 ## 19
 - `accept` warns when `git stash` is not empty: the stash is shared by all worktrees, and a pop in one copy took another task's changes (6 reports; the rule alone did not stop it).
 
