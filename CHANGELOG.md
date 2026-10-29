@@ -1,5 +1,10 @@
 # Changelog
 
+## 18
+- `task show` prints the "General rules" section of the process description; executor and reviewer prompts point there instead of the whole file (≈460 instead of ≈3300 tokens per task).
+- A review stores the commit it looked at; after a rework `task brief --review` points the fresh reviewer to the previous issues and the diff since that commit only.
+- One coordinator per wave: it reports `<m>: wave <n> done` and stops; the main session starts a fresh one (a growing context is paid on every turn).
+
 ## 17
 - `accept` goes to the background by itself when its checks took longer than `checks.bg_after` (100 s) last time, and prints the wait command; `--fg` stays (21 reports: long foreground runs hit the agent's tool timeout).
 - `task new|set --check-timeout NAME SEC`: a check's timeout in the card.

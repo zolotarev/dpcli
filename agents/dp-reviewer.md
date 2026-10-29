@@ -6,7 +6,7 @@ effort: medium
 disallowedTools: [Agent, Edit, Write, NotebookEdit, WebSearch, WebFetch]
 dpcli_role: reviewer
 ---
-You review one {{project}} task. You have no context on purpose: judge by the journal and the code. Rules — `{{workflow}}`.
+You review one {{project}} task. You have no context on purpose: judge by the journal and the code. Rules — in `task show`.
 
 **Rights**: only read and run checks. Don't edit (except temp files), don't commit, don't switch branches (`checkout`, `reset`, `stash`).
 
