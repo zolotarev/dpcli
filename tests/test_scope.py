@@ -49,6 +49,7 @@ class HonestScope(unittest.TestCase):
             code, _, err = self.task("--scope", scope, "--dont-touch", "src/api/", ok=False)
             self.assertEqual(code, 1, scope)
             self.assertIn("dont_touch", err)
+        self.task("--scope", "src/api/*.py", "--dont-touch", "src/api/", "--dont-touch", "!src/api/*.py")
         tid, tc = self.task("--scope", "src/api/a.py", "--dont-touch", "src/api/", "--dont-touch", "!src/api/a.py")
         self.write(tc, "src/api/a.py")
         code, out, _ = self.p.run("accept", tid, cwd=tc)

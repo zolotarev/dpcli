@@ -201,7 +201,7 @@ def check_bounds(card):
     for e in card.get("scope") or []:
         for s in _pat(e):
             fixed = re.split(r"[*?\[]", s)[0].rsplit("/", 1)[0] if any(ch in s for ch in "*?[") else s  # glob's fixed dir
-            if s and not s.startswith("!") and fixed and path_in(fixed.rstrip("/"), dont):
+            if s and not s.startswith("!") and fixed and f"!{s}" not in dont and path_in(fixed.rstrip("/"), dont):
                 raise DpError(f"scope \"{s}\" lies inside dont_touch: add --dont-touch '!{s}' or narrow dont_touch")
 
 
