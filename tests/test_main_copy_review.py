@@ -37,6 +37,13 @@ class MainCopyReview(unittest.TestCase):
         logs = sorted(f.name for f in (self.p.root / "build" / "dpcli" / "AA-1").glob("*.log"))
         self.assertEqual(logs, ["one.log", "two.log"])
 
+    def test_duplicate_check_names_rejected(self):
+        code, _, err = self.p.run("task", "new", "aa", "--type", "dp-engineer", "--title", "T", "--goal", "g",
+                                  "--scope", "src/", "--check", "x", "true", "exit=0", "--check", "x", "false", "exit=0",
+                                  "--no-copy")
+        self.assertEqual(code, 1)
+        self.assertIn("duplicate check names: x", err)
+
     def test_feedback_module_shows_only_matching_clusters(self):
         self.p.ok("module", "init", "bb", "--code", "BB")
         self.p.ok("feedback", "new", "Only in bb", "--match", "zzz", "--scope", "dpcli")
