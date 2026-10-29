@@ -13,6 +13,16 @@ VERDICTS = ("accept", "rework")
 MAX_ISSUES = 7
 
 
+def stdin_has_data():
+    """`< file` or a pipe with data; an idle open pipe (agent shells) must not block."""
+    import os, select, stat
+    try:
+        mode = os.fstat(0).st_mode
+    except OSError:
+        return False
+    return stat.S_ISREG(mode) or (stat.S_ISFIFO(mode) and bool(select.select([0], [], [], 0.2)[0]))
+
+
 def report_file(tid):
     """Per-task report file in the copy: a shared path (/tmp/r.json) let parallel agents overwrite each other."""
     return config.repo_path(config.get("checks.log_dir", "build/dpcli")) / tid / "report.json"
@@ -127,7 +137,7 @@ def cmd_report(a):
             L.append("dpcli: " + short(r["dp_feedback"], 200))
         print("\n".join(L))
         return
-    if a.file == "-" or (a.file is None and not sys.stdin.isatty() and not report_file(a.id).is_file()):
+    if a.file == "-" or (a.file is None and not report_file(a.id).is_file() and stdin_has_data()):
         src = sys.stdin.read()
     else:
         f = Path(a.file) if a.file else report_file(a.id)

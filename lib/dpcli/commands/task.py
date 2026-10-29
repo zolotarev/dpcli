@@ -7,7 +7,6 @@ from pathlib import Path
 from .. import agents, config, copies, gitx
 from ..journal import (ID_RE, add_event, addenda, all_modules, by_default, check_area, check_code, ensure_module, expect_arg,
                        find_task, module_home, module_meta, reserved_codes, task_cards)
-from .report import report_file
 from ..util import CLI, DpError, Parser, hm, lang_commit, now, pretty, read_json, read_jsonl, rel, short, subgroup, write_json
 
 CARD_TEMPLATE = {
@@ -82,6 +81,11 @@ def cmd_task_new(a):
                                   if empty else ""))
     if not a.no_copy:
         print(make_copy(card))
+
+
+def _report_path(tid):
+    from .report import report_file  # lazy: task does not depend on report at import time
+    return rel(report_file(tid))
 
 
 def check_plan_ref(mod, ref):
@@ -174,7 +178,7 @@ def cmd_task_brief(a):
              f"Copy: {cp}  branch: {br} (from {base})",
              f"Do: {CLI} task show {tid}  · plan: {CLI} plan {mod} {sect}",
              bound,
-             f"Done when: {CLI} accept {tid} --dry → PASS; report: {rel(report_file(tid))} → {CLI} report {tid}",
+             f"Done when: {CLI} accept {tid} --dry → PASS; report: {_report_path(tid)} → {CLI} report {tid}",
              f"Reply: one line «{tid} reported» | «{tid} blocked: <reason ≤15 words>» | «{tid} contract: <what to change>»"]
     print("\n".join(L))
 
@@ -332,7 +336,7 @@ def cmd_task_show(a):
     L.append(f"Long runs: `{CLI} job start <name> <timeout_s> <command…>`, wait with `{CLI} job wait <name> <timeout_s>` "
              "in the background (run_in_background), not `until grep` loops.")
     rx = ", ".join(f"«{k}»" for k in card.get("report_extra") or [])
-    L.append(f"Report: write {rel(report_file(card['id']))}, then {CLI} report {card['id']} (schema with the card's fields: {CLI} report --template {card['id']})"
+    L.append(f"Report: write {_report_path(card['id'])}, then {CLI} report {card['id']} (schema with the card's fields: {CLI} report --template {card['id']})"
              f"{'; required top-level report fields: ' + rx if rx else ''}; finish with dpcli feedback "
              "(field dp_feedback).")
     if full:

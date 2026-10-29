@@ -41,6 +41,9 @@ class PlanSections(unittest.TestCase):
 
     def test_plan_ref_checked_at_task_new(self):
         args = ["task", "new", "pf", "--type", "dp-engineer", "--title", "t", "--goal", "g", "--scope", "src", "--no-copy"]
+        for bad in ("7. Nowhere", "7. Nowhere (x)", "Goal (1)"):
+            code, _, err = self.p.run(*args, "--plan-ref", bad)
+            self.assertEqual(code, 1, bad)
         code, _, err = self.p.run(*args, "--plan-ref", "7. Nowhere")
         self.assertEqual(code, 1)
         self.assertIn("plan_ref", err)
@@ -62,6 +65,11 @@ class ReportFile(unittest.TestCase):
         f.write_text(json.dumps(report("PF-1")))
         self.assertIn("PF-1: report done", self.p.ok("report", "PF-1"))
         self.assertIn("build/dpcli/PF-1/report.json", self.p.ok("task", "brief", "PF-1"))
+
+    def test_no_file_and_no_stdin_fails_fast(self):
+        code, _, err = self.p.run("report", "PF-1", timeout=10)
+        self.assertEqual(code, 1)
+        self.assertIn("no report file", err)
 
     def test_report_of_another_task_rejected(self):
         code, _, err = self.p.run("report", "PF-2", input=json.dumps(report("PF-1")))
