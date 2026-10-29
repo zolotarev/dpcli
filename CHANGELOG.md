@@ -1,5 +1,9 @@
 # Changelog
 
+## 28
+- Hook `UserPromptSubmit` (`hooks/context_guard.py`, installed by `init`): when the main session's last turn is over `$DPCLI_CONTEXT_MAX` (300k) tokens, one line asks to finish the step and start a new session — a long main session re-reads its context on every turn and cost more than all the agents it ran.
+- `stats --tokens` adds the main sessions' context tokens (all modules, `--since` applies).
+
 ## 27
 - `module new` tells dpcli branches by the journal (module branches, task card branches), not by the `module_branch` / `task_branch` templates: a feature branch like `feature/x` or `a/b` is a valid base again.
 - `accept` estimates check durations from the task's journal (`durs`) when this copy has no `results.json` — `accept --here` in the module copy goes to the background like in the task copy.

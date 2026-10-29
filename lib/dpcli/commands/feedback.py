@@ -152,7 +152,8 @@ def cmd_stats(a):
     if a.module and a.module not in mods:
         raise DpError(f"module {a.module} not found (have: {', '.join(mods) or 'none'})")
     durs = {}
-    usage = agent_usage({t: m for m, h in mods.items() for t in task_cards(h)}) if a.tokens else {}
+    usage, main = agent_usage({t: m for m, h in mods.items() for t in task_cards(h)}, a.since or "") \
+        if a.tokens else ({}, None)
     for mod, home in mods.items():
         if a.module and mod != a.module:
             continue
@@ -182,34 +183,29 @@ def cmd_stats(a):
             roles = " · ".join(f"{r} {_m(u[r][0])} ({u[r][1]})" for r in ("executors", "reviewers", "coordinators") if r in u)
             per = list(u["tasks"].values())
             print(f"  tokens (context): {roles}" + (f" | per task median {_m(statistics.median(per))}" if per else ""))
+    if main:  # every turn re-reads the whole context: a long main session costs more than the agents it runs
+        print(f"main sessions (all modules): {_m(main[0])} in {main[1]}, largest turn {main[2] // 1000}k")
     if durs:
         print("checks, s (median/max): " + " · ".join(f"{n} {statistics.median(v):.0f}/{max(v):.0f}"
                                                       for n, v in sorted(durs.items(), key=lambda kv: -max(kv[1]))))
 
 
-def agent_usage(task_module):
-    """{module: {role: [context tokens, agents], "tasks": {ID: tokens}}} from Claude Code's subagent logs of this
-    project. An agent is dpcli's when its first message is a brief: "<ID> <type>: …", "Review <ID>: …", "Module <m>: …"."""
-    import json
+def agent_usage(task_module, since=""):
+    """({module: {role: [context tokens, agents], "tasks": {ID: tokens}}}, (main sessions' tokens, sessions, largest
+    turn) | None) from Claude Code's logs of this project. An agent is dpcli's when its first message is a brief:
+    "<ID> <type>: …", "Review <ID>: …", "Module <m>: …"."""
     import re
     from pathlib import Path
     from .. import gitx
     root = gitx.main_worktree()
     base = Path.home() / ".claude" / "projects" / re.sub(r"[/_.]", "-", str(root)) if root else None
     out = {}
-    for f in sorted(base.glob("*/subagents/*.jsonl")) if base and base.is_dir() else []:
-        first, ctx = None, 0
-        for line in f.open(errors="replace"):
-            try:
-                r = json.loads(line)
-            except ValueError:
-                continue
-            if first is None and r.get("type") == "user":
-                c = (r.get("message") or {}).get("content")
-                first = c if isinstance(c, str) else " ".join(x.get("text", "") for x in c or [] if isinstance(x, dict))
-            u = (r.get("message") or {}).get("usage") if r.get("type") == "assistant" else None
-            if u:
-                ctx += u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
+    have = base and base.is_dir()
+    main = [_log_ctx(f, since) for f in sorted(base.glob("*.jsonl"))] if have else []  # main sessions: not per module
+    main = [(ctx, peak) for _, ctx, peak in main if ctx]
+    main = (sum(c for c, _ in main), len(main), max(p for _, p in main)) if main else None
+    for f in sorted(base.glob("*/subagents/*.jsonl")) if have else []:
+        first, ctx, _ = _log_ctx(f, "")
         # English protocol, and the Russian one of older journals ("Ревью <ID>", "Модуль <m>:")
         m = re.match(r"\s*(?:(Review|Ревью) )?([A-Z]{2,4}-[A-Z]?\d+[a-z]?)\b|\s*(?:Module|Модуль) (\S+?):", first or "")
         if not m:
@@ -224,7 +220,26 @@ def agent_usage(task_module):
         d[role][1] += 1
         if m[2]:
             d["tasks"][m[2]] = d["tasks"].get(m[2], 0) + ctx
-    return out
+    return out, main
+
+
+def _log_ctx(f, since):
+    """(first user message, context tokens of turns since `since`, largest one turn's context) of a Claude Code log."""
+    import json
+    first, ctx, peak = None, 0, 0
+    for line in f.open(errors="replace"):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if first is None and r.get("type") == "user":
+            c = (r.get("message") or {}).get("content")
+            first = c if isinstance(c, str) else " ".join(x.get("text", "") for x in c or [] if isinstance(x, dict))
+        u = (r.get("message") or {}).get("usage") if r.get("type") == "assistant" else None
+        if u and str(r.get("timestamp", "")) >= since:
+            n = u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
+            ctx, peak = ctx + n, max(peak, n)
+    return first, ctx, peak
 
 
 def _m(n):
