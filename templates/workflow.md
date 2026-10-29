@@ -67,7 +67,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Deterministic work — `{{cli}}` commands (`search`, `plan`, `docs`, `log`, `status`, `task`, `sync/merge`); don't write your own grep/scripts over the journal, plans and docs. A command is missing — work around once and log feedback.
 - Correctness over "looks nice": parameters are justified (domain, measurements, sources), numbers come from measurements, results from reports; assumptions and limits go into the report.
 - Minor visual/style details — at most 2 attempts.
-- Fast tools: search — `rg`; files — `fd` or `rg --files`; JSON — `jq`; code structure — `ast-grep`; read a file with the Read tool (offset/limit), not `cat`/`sed -n`; Python beyond one line — a script file run with `uv run` or `python3 file.py`, not a long `python3 -` heredoc.
+- Tools: files — Read (offset/limit), Edit, Write; not `sed -n`/`sed -i`/`cat >`/`python3 -` replacements: they cost the whole text in output and break on escaping. Bash runs programs: search — `rg`, files — `fd`, JSON — `jq`, structural search/rewrite of code — `ast-grep`; Python beyond one line — a script file (`uv run` / `python3 file.py`).
 - Tests — non-interactive. GPU — `{{cli}} lock gpu <name> -- <cmd>`, heavy CPU — `{{cli}} lock cpu …`.
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
 - Batches of runs — one script, one background run, results as a table.

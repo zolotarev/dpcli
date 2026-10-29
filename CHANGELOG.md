@@ -1,5 +1,9 @@
 # Changelog
 
+## 20
+- Process rule: files are read and edited with the Read, Edit and Write tools — executors in the first project made ≈9800 Bash calls and almost no Edit/Write: ≈500 `python3 -` replacements, ≈360 `sed -i`, ≈310 `cat >`, ≈800 `sed -n`; each pays the whole text in output and breaks on escaping. Bash is for running programs (`rg`, `fd`, `jq`, `ast-grep`).
+- `install.sh --tools`: quiet non-interactive apt; a hint when `~/.local/bin` is not on PATH.
+
 ## 19
 - `accept` warns when `git stash` is not empty: the stash is shared by all worktrees, and a pop in one copy took another task's changes (6 reports; the rule alone did not stop it).
 
