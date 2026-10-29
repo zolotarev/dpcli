@@ -1,6 +1,6 @@
 # Working with agents — {{project}}
 
-Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). The process exists to save context: agents exchange IDs and commands, details live in the journal.
+Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands; details live in the journal.
 
 **Language.** Everything written for people — replies to the user, reports, journal entries, plans, docs — in {{language_text}}. Commit messages in {{language_commits}}.
 
@@ -19,7 +19,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 5. User check → on approval `{{cli}} deliver <m>`: one squash commit into the module base (`--into` — another branch); of the journal only `decisions.md` and `summary.md` go there; the full journal stays in `{{module_branch}}` (and under an archive tag if `deliver.archive_tag` is set); plan and contracts get `status: closed`, `INDEX.md` is rebuilt. Don't develop the module branch after delivery. Feature branch into `{{main_branch}}` — only by the user's decision (usually an MR merged by a human); `deliver`/`merge` into `{{main_branch}}` — only with explicit `--into`.
 
 ## Message protocol
-Agents send only these formats; details are in the journal.
+Agents send only these formats.
 
 | From → to | Message |
 |---|---|
@@ -33,9 +33,7 @@ Agents send only these formats; details are in the journal.
 
 - User decisions are already in the inbox (via `decide`); don't retell them in messages.
 - Add nothing to `brief`: task specifics go into the card (`{{cli}} task note <ID> "…"`).
-- Don't retell the journal (report, review, status) — give the ID.
-- Missing information — ask in one line, don't read someone else's context.
-- New rules for a running agent — by message, no restart.
+- Missing information — ask in one line. New rules for a running agent — by message, no restart.
 
 ## Task card — boundaries
 The coordinator writes it so the executor has nothing to search for:
@@ -49,7 +47,7 @@ The coordinator writes it so the executor has nothing to search for:
 
 ## Contracts
 `{{contracts_dir}}/<m>.md` — per interface: owner and consumers, the exact interface (signatures, fields, units, axes, types, behaviour on missing data, invariants), version.
-- Record what already exists in code; report discrepancies.
+- Record what exists in code; report discrepancies.
 - Only the coordinator changes an interface: version +1, notify consumers, their fix in the same step.
 - A contract test breaks if the format changed without updating the contract.
 - Bulk data between tasks — format in the contract with a version; compact, with a schema, written once (temp file + rename).
@@ -67,10 +65,8 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 ## General rules
 - Refer to decisions in plans, contracts and cards by `Q<n>` or date `YYYY-MM-DD`, not by time ("decision 12:35"): after delivery the journal with timestamps is not in the branch.
 - Deterministic work — `{{cli}}` commands (`search`, `plan`, `docs`, `log`, `status`, `task`, `sync/merge`); don't write your own grep/scripts over the journal, plans and docs. A command is missing — work around once and log feedback.
-- Agents do only what needs thought: design, find the cause, write code/text.
-- Correctness over "looks nice": parameters are justified (domain, measurements, sources); assumptions and limits go into the report.
-- Don't invent: numbers come from measurements, results from reports.
-- Don't polish: minor visual/style details — at most 2 attempts.
+- Correctness over "looks nice": parameters are justified (domain, measurements, sources), numbers come from measurements, results from reports; assumptions and limits go into the report.
+- Minor visual/style details — at most 2 attempts.
 - Fast tools: search — `rg`; files — `fd` or `rg --files`; JSON — `jq`; code structure — `ast-grep`; read a file with the Read tool (offset/limit), not `cat`/`sed -n`; Python beyond one line — a script file run with `uv run` or `python3 file.py`, not a long `python3 -` heredoc.
 - Tests — non-interactive. GPU — `{{cli}} lock gpu <name> -- <cmd>`, heavy CPU — `{{cli}} lock cpu …`.
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
@@ -84,7 +80,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only via commands, never edit by hand. It is the module branch's working journal: commit it there freely, it does not go into the target branch — `deliver` folds it into `decisions.md` (decisions, questions with answers) and `summary.md` (task results, not done, doubts). Full view for the coordinator — `{{cli}} render <m>`.
 - Task ID `<CODE>-<n>[letter]`; `task new <m>` without an ID takes the next number.
 - Executor: `{{cli}} task show <ID>` → work → `{{cli}} accept <ID> --dry` → `{{cli}} report <ID> < r.json` (schema `report --template`; `uncertain` — doubts and what was checked; `dp_feedback`). `report` is the only write into the module copy.
-- Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`; frictions — see "Self-improvement".
+- Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`.
 
 ## Documentation
 - Entry — `{{docs_dir}}/INDEX.md`. Find — `{{cli}} docs find <words>`, `{{cli}} docs findings <words>`, module journals — `{{cli}} search <text>` (`--sem` — by meaning, if enabled).
@@ -104,7 +100,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 | `dp-reviewer` | sonnet | risk-based review; hardest tasks — launch with `model: opus` |
 | `dp-status` | haiku | status summary for the main session |
 
-Opus only if the task needs design that cannot be moved into the plan or a contract. On failure — refine the card first, change the model second.
+Opus only if the design cannot be moved into the plan or a contract. On failure — refine the card first, the model second.
 
 ## Agent setup
 - dpcli agents — `.dpcli/agents/*.md` (Claude Code format + `dpcli_role: coordinator|executor|reviewer|status`, `dpcli_review: true|false`); `{{cli}} init` puts them into `.claude/agents/`.
@@ -114,18 +110,16 @@ Opus only if the task needs design that cannot be moved into the plan or a contr
 - Role registry — `{{cli}} agents`.
 
 ## Monitoring
-- The main session does not poll: it wakes on a coordinator message (gate, `<m> done`, blocked) or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`); daily summary — `{{cli}} digest --since today`.
+- The main session does not poll: it wakes on a coordinator message or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`); daily summary — `{{cli}} digest --since today`.
 - Stall: "⚠quiet" > 30–40 min — find out what it is doing, report.
 
 ## Sessions and context
 Every turn pays for the whole session context again.
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
 - With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
-- Subagents — only when needed (protocol, waves).
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
-- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`. No status here.
-- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 proposals to the user.
+- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`.- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 proposals to the user.
 - **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — never edited in place: a branch `improve/*` in `.dpcli` and `{{cli}} contribute F-n` (a PR to the dpcli hub or a +1 on a similar one); everyone gets it with the next update.
 - The user's remarks about the work — into memory (feedback) at once, without waiting for a review.
