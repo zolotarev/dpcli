@@ -18,4 +18,5 @@ A portable process tool for projects run by Claude Code agents. User docs — [R
 - English everywhere: code, comments, CLI output, agents, templates, docs, commits. Text dpcli writes into a project's files goes through `lang_text(en, ru)`, commit messages through `lang_commit(en, ru)` (`util.py`, config `language.text` / `language.commits`).
 - Project vs dpcli: project-specific rules, agent additions and the friction ledger live in the project's `.dpcli-local/`, never here. Improvements to dpcli itself reach `main` only via PR (`dpcli contribute`), label `feedback`.
 - Public repository: no project data (names, paths, quotes) — only anonymized conclusions.
+- Clean up after yourself: `improve/*` branches, worktrees and temp files you made — remove once merged or unneeded.
 - Lightness is a feature: agent prompts and templates are paid on every agent run; `tools/budgets.json` caps them, a nightly job tries to shrink the code. Deleting beats adding.
