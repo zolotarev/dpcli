@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse hook (Bash): refuse editing project files through the shell — `sed -i`, `perl -i`,
-`cat > file <<`, `python3 -` heredocs that write files. Edit/Write replace exactly and pay only the change; shell
-edits pay the whole text in output and break on escaping. Exit 2 = blocked, stderr goes back to the agent.
-Allowed: temporary files (/tmp, $TMPDIR, /dev). Not covered on purpose: `echo/printf/tee > file` (small writes);
-a multi-line quoted string whose line starts like an edit is a known false positive."""
+"""PreToolUse hook (Bash): refuse editing project files through the shell (sed -i, perl -i, cat > file <<, python3 -
+heredocs that write); Edit/Write pay only the change. Exit 2 = blocked. Temporary files pass; echo/tee > file are
+not covered on purpose."""
 import json
 import re
 import sys
@@ -11,7 +9,7 @@ import sys
 TEMP = ("/tmp/", "$TMPDIR", "${TMPDIR", "/dev/")
 SHELL = [  # on every command line outside heredoc bodies, quoted strings removed; -i anywhere in the arguments
     (r"\bsed\b[^|;&]*?\s(?:-[a-zA-Z]*i\b|--in-place)", "sed -i"),
-    (r"\bperl\b[^|;&]*?\s-[a-zA-Z]*i", "perl -i"),
+    (r"\bperl\b[^|;&]*?\s-[lnpaws0]*i[.\w]*(?=\s|$)", "perl -i"),  # switch clusters only: not -Mstrict, -fail
     (r"\bcat\s*>>?\s*([^\s&|;<>]+)\s*<<", "cat > file <<"),
 ]
 PY_HEREDOC = re.compile(r"\bpython3?\s+-\s*<<")
@@ -41,7 +39,8 @@ def edits(ln):
         m = re.search(rx, ln)
         if not m:
             continue
-        target = m.group(1) if m.groups() else (ln[m.end():].split() or [""])[-1]
+        seg = re.split(r"[|;&]", ln[m.end():], maxsplit=1)[0]  # this command only, not `; rm /tmp/x` after it
+        target = m.group(1) if m.groups() else (seg.split() or [""])[-1]
         if not target.startswith(TEMP):  # temporary files are not project files
             return what
     return None
@@ -54,12 +53,14 @@ def main():
         return 0
     lines, body = split(cmd)
     hits = [w for w in map(edits, lines) if w]
-    if any(PY_HEREDOC.search(ln) for ln in lines) and PY_WRITES.search(body):
+    writes = [ln for ln in body.split("\n") if PY_WRITES.search(ln) and not any(t.strip("/") in ln for t in TEMP)]
+    if any(PY_HEREDOC.search(ln) for ln in lines) and writes:
         hits.append("python3 - writing files")
     if not hits:
         return 0
     print(f"dpcli: {hits[0]} edits project files through the shell — use the Edit tool (exact replacement) or Write "
-          f"(new file); read with Read. Temporary files (/tmp, $TMPDIR) are fine.", file=sys.stderr)
+          f"(new file); read with Read; bulk renames: ast-grep run -p OLD -r NEW -U. Temporary files (/tmp) are fine.",
+          file=sys.stderr)
     return 2
 
 

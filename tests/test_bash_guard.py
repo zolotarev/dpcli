@@ -24,6 +24,7 @@ class BashGuard(unittest.TestCase):
                     "grep x <<< word\nsed -i 's/a/b/' f",  # a here-string is not a heredoc
                     "sed -n -i 's/a/b/' f", "sed -e 's/a/b/' -i f", "perl -e 's/a/b/' -pi f",  # -i anywhere
                     "echo \"<<EOF\"\nsed -i 's/a/b/' f",  # a quoted "<<EOF" opens no heredoc
+                    "sed -i s/a/b/ src/x.ts; rm /tmp/y", "sed -i s/a/b/ src/x.ts && rm /tmp/z",  # target of its own segment
                     "cat > src/x.ts <<'EOF'\nx\nEOF", "python3 - <<'EOF'\nfrom pathlib import Path\nPath('a').write_text('x')\nEOF",
                     "python3 - <<'EOF'\nopen('a', 'w').write('x')\nEOF"):
             code, err = run(cmd)
@@ -36,7 +37,9 @@ class BashGuard(unittest.TestCase):
                     "python3 - <<'EOF'\nimport sys\nsys.stdout.write('x')\nEOF", "git commit -m 'sed -i is gone'",
                     "cat <<'EOF'\nsed -i is text here\nEOF",
                     "cat > /tmp/fixture.json <<'EOF'\n{}\nEOF", "sed -i 's/a/b/' /tmp/x.log",
-                    "cat > \"$TMPDIR/r.json\" <<'EOF'\n{}\nEOF"):
+                    "cat > \"$TMPDIR/r.json\" <<'EOF'\n{}\nEOF", "sed -i s/a/b/ /tmp/x && git add .",
+                    "perl -MList::Util=sum -e 'print 1'", "perl -Mstrict -e 1", "perl script.pl -fail",
+                    "python3 - <<'EOF'\nopen('/tmp/a', 'w').write('x')\nEOF"):
             self.assertEqual(run(cmd)[0], 0, cmd)
 
     def test_missing_script_fails_open(self):

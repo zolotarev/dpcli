@@ -1,7 +1,7 @@
 # Changelog
 
 ## 22
-- `init` installs a `PreToolUse` hook (`hooks/bash_guard.py`): editing files through Bash (`sed -i`, `perl -i`, `cat > file <<`, `python3 -` heredocs writing files) is refused with a pointer to Edit/Write; programs, reads, quoted text and temporary files (/tmp, $TMPDIR) pass. Every command line outside heredoc bodies is checked, `-i` anywhere in the arguments; `echo/printf/tee > file` are not covered on purpose. The hook fails open when the script is missing (a copy without the submodule). Existing projects get it with `update` (it runs `init`). The v20 rule alone was not expected to change the habit (≈1200 such edits in the first project).
+- A `PreToolUse` hook (installed by `init`, delivered by `update`) refuses editing project files through Bash and points the agent to Edit/Write; programs, reads and temporary files pass. In the first project agents made ≈1200 such edits and no Edit calls; the v20 rule alone was not expected to change that.
 
 ## 21
 - Reviewing work that lives in the main copy (a `--no-copy` card): `task brief` names the copy and branch where the work is instead of a copy that does not exist; `accept --here` checks the uncommitted changes against the scope instead of skipping it.
