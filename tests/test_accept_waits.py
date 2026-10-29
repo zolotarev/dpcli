@@ -1,5 +1,7 @@
 """Frictions: long accept blocks the agent; check timeout not settable; lock output lost in tmux; job names collide."""
 import json
+import subprocess
+import sys
 import unittest
 
 from helpers import Project, git
@@ -28,6 +30,18 @@ class AcceptWithoutWaits(unittest.TestCase):
         self.assertIn("job wait dp-accept-AA-1", out)
         self.assertIn("PASS slow", self.p.ok("job", "wait", "dp-accept-AA-1", "60"))
         self.assertIn("PASS slow", self.p.ok("accept", "AA-1", "--dry", "--fg"))
+
+    def test_check_does_not_read_agent_stdin(self):
+        # a formatter run without files waited on stdin the agent keeps open, until the check timeout
+        self.p.ok("task", "set", "AA-1", "--check", "slow", "cat", "exit=0", "--check-timeout", "slow", "5")
+        pr = subprocess.Popen([sys.executable, str(self.p.cli), "accept", "AA-1", "--dry", "--fg"], cwd=self.p.root,
+                              env=self.p.env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        try:
+            out = pr.stdout.read()  # stdin stays open, as an agent's does; the check timeout (5 s) bounds a hang
+        finally:
+            pr.stdin.close()
+            pr.wait()
+        self.assertIn("PASS slow", out)
 
     def test_lock_runs_in_foreground_with_output(self):
         import os

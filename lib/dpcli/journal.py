@@ -91,8 +91,10 @@ def resolve_target(x):
 
 
 def is_work_branch(br):
-    """A dpcli module or task branch — no module is created from it and nothing is delivered to it."""
-    return bool(config.module_of_branch(br) or config.task_branch_fields(br))
+    """A dpcli module or task branch — no module is created from it and nothing is delivered to it. By the journal:
+    any feature branch may match the name templates (`feature/x`, `a/b`)."""
+    return any(br == module_meta(m, h)["branch"] or any((c or {}).get("branch") == br for c in task_cards(h).values())
+               for m, h in all_modules().items())
 
 
 def module_base(meta):

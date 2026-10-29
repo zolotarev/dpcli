@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .. import agents, config, copies, gitx, reexec
 from ..journal import add_event, by_default, expect_arg, find_task
-from ..util import CLI, DpError, die, now, read_json, rel, short, write_json
+from ..util import CLI, DpError, die, now, read_json, read_jsonl, rel, short, write_json
 from .jobs import job_start, qualify, tmux_args, tmux_opts
 
 
@@ -134,7 +134,7 @@ def run_check(c, cwd, logdir, idx, tid):
     t0 = time.time()
     try:
         r = subprocess.run(["bash", "-c", cmd], cwd=wd, env=env, capture_output=True, text=True,
-                           timeout=c.get("timeout", 900))
+                           stdin=subprocess.DEVNULL, timeout=c.get("timeout", 900))  # `prettier --check` without files reads stdin
         code, out = r.returncode, r.stdout + ("\n" + r.stderr if r.stderr else "")
     except subprocess.TimeoutExpired as e:
         code, out = 124, (e.stdout or b"").decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
@@ -281,10 +281,15 @@ def accept_bg(a, cwd, logdir):
     sys.exit(0)
 
 
-def expected_seconds(logdir, checks, jobs):
-    """Duration of the same checks last time (results.json): sum, or the longest one when run in parallel."""
+def expected_seconds(logdir, home, tid, checks, jobs):
+    """Duration of the same checks last time (results.json of this copy, else the journal's `durs`): sum, or the
+    longest one when run in parallel."""
     store = read_json(logdir / "results.json") or {}
-    durs = [float((store.get(c.get("name")) or {}).get("dur") or 0) for c in checks]
+    last = {}
+    for e in read_jsonl(home / "events.jsonl"):
+        if e.get("task") == tid and isinstance(e.get("durs"), dict):
+            last.update(e["durs"])
+    durs = [float((store.get(c.get("name")) or {}).get("dur") or last.get(c.get("name")) or 0) for c in checks]
     return (max(durs, default=0) if jobs > 1 else sum(durs))
 
 
@@ -302,7 +307,7 @@ def cmd_accept(a):
     logdir.mkdir(parents=True, exist_ok=True)
     if a.bg:
         return accept_bg(a, cwd, logdir)
-    est = expected_seconds(logdir, checks, a.jobs)
+    est = expected_seconds(logdir, home, a.id, checks, a.jobs)
     limit = int(config.get("checks.bg_after", 100) or 0)
     if not a.fg and limit and est > limit:  # a foreground run this long hits the agent's tool timeout
         print(f"{a.id}: last run took ~{est:.0f} s > {limit} s — running in the background ({CLI} accept … --fg to wait here)")

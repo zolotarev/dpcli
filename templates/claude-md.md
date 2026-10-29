@@ -1,6 +1,6 @@
 ## Working with agents (dpcli)
 
-Before multi-step work read **`{{workflow}}`**. Journal, tasks, branches, docs — only via `{{cli}}` (`{{cli}} -h`).
+Before multi-step work read **`{{workflow}}`**. Journal, tasks, branches, docs — only via `{{cli}}` (`{{cli}} -h`), one command per Bash call: chained with `&&` / `cd …;` it misses the `Bash({{cli}} *)` permission and may be refused.
 
 - Language: replies, reports, journal, plans, docs — {{language_text}}; commit messages — {{language_commits}}.
 - Roles: user — decisions; main session — plans, module coordinators, reports on events (gate, `<m> done`) or on request, merges into `{{main_branch}}` on approval; `dp-coordinator` — contracts, cards, acceptance, gates; executor — one task in its own copy.

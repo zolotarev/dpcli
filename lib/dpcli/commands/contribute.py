@@ -44,7 +44,7 @@ def cmd_contribute(a):
     branch = run("git", "branch", "--show-current", cwd=dist).stdout.strip()
     commits = run("git", "log", "--format=%s", "origin/main..HEAD", cwd=dist).stdout.split("\n")
     commits = [x for x in commits if x.strip()]
-    if commits and not branch.startswith("improve/"):
+    if commits and not branch.startswith(f"improve/{a.id}-"):  # the current branch is pushed: another cluster's otherwise
         raise DpError(f"commit the change on a branch improve/{a.id}-<slug>: git -C .dpcli switch -c improve/{a.id}-<slug>")
     title = a.title or c["title"]
     by_c, _ = assign(items(), {a.id: c})

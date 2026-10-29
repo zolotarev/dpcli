@@ -1,5 +1,21 @@
 # Changelog
 
+## 28
+- Hook `UserPromptSubmit` (`hooks/context_guard.py`, installed by `init`): when the main session's last turn is over `$DPCLI_CONTEXT_MAX` (300k) tokens, one line asks to finish the step and start a new session — a long main session re-reads its context on every turn and cost more than all the agents it ran.
+- `stats --tokens` adds the main sessions' context tokens (all modules, `--since` applies).
+- `contribute F-n` requires the branch `improve/F-n-…`: it pushes the current branch, and from another cluster's branch the PR carried that cluster's commits.
+- CLAUDE.md block: one `dpcli` command per Bash call — a chained one misses the permission rule and was refused.
+
+## 27
+- `module new` tells dpcli branches by the journal (module branches, task card branches), not by the `module_branch` / `task_branch` templates: a feature branch like `feature/x` or `a/b` is a valid base again.
+- `accept` estimates check durations from the task's journal (`durs`) when this copy has no `results.json` — `accept --here` in the module copy goes to the background like in the task copy.
+
+## 26
+- `feedback`: a report's `dp_feedback` given as a list is read as one friction per entry (was a TypeError for the whole ledger).
+
+## 25
+- `accept`: checks run with stdin from `/dev/null` — a formatter called without files (`prettier --check`) waited on the agent's open stdin until the check timeout.
+
 ## 24
 - `stats --tokens`: context tokens spent by executors, reviewers and coordinators per module, and per task, read from Claude Code's subagent logs (an agent is attributed by its first message — the dpcli brief). Lets a process change be checked by numbers.
 
