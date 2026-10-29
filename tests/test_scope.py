@@ -45,9 +45,10 @@ class HonestScope(unittest.TestCase):
         self.assertEqual(code, 0, out)
 
     def test_scope_inside_dont_touch_rejected_then_exclusion_works(self):
-        code, _, err = self.task("--scope", "src/api/a.py", "--dont-touch", "src/api/", ok=False)
-        self.assertEqual(code, 1)
-        self.assertIn("dont_touch", err)
+        for scope in ("src/api/a.py", "src/api/*.py"):
+            code, _, err = self.task("--scope", scope, "--dont-touch", "src/api/", ok=False)
+            self.assertEqual(code, 1, scope)
+            self.assertIn("dont_touch", err)
         tid, tc = self.task("--scope", "src/api/a.py", "--dont-touch", "src/api/", "--dont-touch", "!src/api/a.py")
         self.write(tc, "src/api/a.py")
         code, out, _ = self.p.run("accept", tid, cwd=tc)
@@ -65,7 +66,8 @@ class HonestScope(unittest.TestCase):
         git("switch", "-q", "aa/" + tid, cwd=tc)
         git("merge", "-q", "--no-ff", "-m", "merge side", "side", cwd=tc)
         code, out, _ = self.p.run("accept", tid, cwd=tc)
-        self.assertEqual(code, 0, out)
+        self.assertEqual(code, 0, out)  # deliberate: merged-in files are not the task's; the note says what is unchecked
+        self.assertIn("1 merge commit(s): conflict resolutions not checked", out)
 
     def test_hint_tests_referencing_scope_files(self):
         f = self.mc / "src" / "billing.py"

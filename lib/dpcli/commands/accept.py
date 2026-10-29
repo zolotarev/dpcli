@@ -184,7 +184,8 @@ EXCLUDE_WORDS = {"кроме", "except", "excluding"}  # unambiguous only: notes
 
 def check_bounds(card):
     """scope/dont_touch are paths or globs; exclusions are `!pattern` entries, not prose; scope must not lie inside
-    dont_touch — both made accept fail on files the card itself requires."""
+    dont_touch — both made accept fail on files the card itself requires. Prose is detected by an exclusion word
+    after the first word of the path part or at the start of a note (so `docs/My notes except.md` needs backticks)."""
     for key in ("scope", "dont_touch"):
         for e in card.get(key) or []:
             if str(e).lstrip().startswith("`"):
@@ -194,11 +195,13 @@ def check_bounds(card):
             note = str(e)[m.end():].strip(" (").lower().split()[:1] if m else []
             if EXCLUDE_WORDS & {w.strip("()[],;:") for w in words + note}:
                 raise DpError(f"{key} \"{e}\": write exclusions as separate entries `!<path>`, not as text "
-                              f"(e.g. --dont-touch src/api/ --dont-touch '!src/api/a.py')")
+                              f"(e.g. --dont-touch src/api/ --dont-touch '!src/api/a.py'); an old entry: remove it with "
+                              f"task set <ID> '{key}-={e}'")
     dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]
     for e in card.get("scope") or []:
         for s in _pat(e):
-            if s and not s.startswith("!") and not any(ch in s for ch in "*?[") and path_in(s.rstrip("/"), dont):
+            fixed = re.split(r"[*?\[]", s)[0].rsplit("/", 1)[0] if any(ch in s for ch in "*?[") else s  # glob's fixed dir
+            if s and not s.startswith("!") and fixed and path_in(fixed.rstrip("/"), dont):
                 raise DpError(f"scope \"{s}\" lies inside dont_touch: add --dont-touch '!{s}' or narrow dont_touch")
 
 
@@ -248,7 +251,7 @@ def scope_check(card, cwd, mod):
         parts.append("outside scope: " + ", ".join(out[:10]) + (f" … (+{len(out) - 10})" if len(out) > 10 else ""))
     if bad:
         parts.append("in dont_touch: " + ", ".join(bad[:10]) + (f" … (+{len(bad) - 10})" if len(bad) > 10 else ""))
-    return False, "; ".join(parts)
+    return False, "; ".join(parts) + note
 
 
 def accept_bg(a, cwd, logdir):
