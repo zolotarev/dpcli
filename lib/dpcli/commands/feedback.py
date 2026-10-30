@@ -22,8 +22,10 @@ def norm(s):
 
 
 def items(since="", module=None):
-    """[{t, module, task, text, src}] from the journals of all modules."""
-    out = []
+    """[{t, module, task, text, src}] from the journals of all modules and, for delivered modules (journal gone),
+    the ledger's `item` records written by deliver."""
+    out = [{k: r.get(k) for k in ("t", "module", "task", "text", "src")} for r in read_jsonl(ledger_path())
+           if r.get("kind") == "item" and r.get("t", "") >= since and (not module or r.get("module") == module)]
     for mod, home in all_modules().items():
         if module and mod != module:
             continue
@@ -42,7 +44,17 @@ def items(since="", module=None):
             r = read_json(f) or {}
             if r.get("harness") and r.get("t", "") >= since:
                 out.append({"t": r.get("t", ""), "module": mod, "task": f.name[:-12], "text": r["harness"], "src": "review"})
-    return [i for i in out if norm(i["text"]) not in EMPTY]
+    uniq = {(i["module"], i["t"], i["text"]): i for i in out}  # a delivered item whose journal is still around
+    return [i for i in uniq.values() if norm(i["text"]) not in EMPTY]
+
+
+def keep_items(mod):
+    """Before deliver drops the journal: the module's frictions go to the ledger as `item` records."""
+    have = {(r.get("t"), r.get("text")) for r in read_jsonl(ledger_path())
+            if r.get("kind") == "item" and r.get("module") == mod}
+    for i in items(module=mod):
+        if (i["t"], i["text"]) not in have:
+            append_jsonl(ledger_path(), {**i, "kind": "item"})
 
 
 def ledger():
