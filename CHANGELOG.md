@@ -1,5 +1,8 @@
 # Changelog
 
+## 30
+- `update` moves `.dpcli` to the release tag when it already has the release's VERSION but sits on another commit (an own PR squash-merged, the branch commit still checked out); it used to report "up to date" and commit the pointer at the branch commit.
+
 ## 29
 - CLAUDE.md block: after a merge — `gc --remove` (merged copies and branches); sessions left merged branches behind.
 
