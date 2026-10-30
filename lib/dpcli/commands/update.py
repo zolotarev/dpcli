@@ -83,7 +83,10 @@ def update_dist(a):
     tags = sorted(n for n in map(tag_num, run("git", "tag", "-l", "v*", cwd=dist).stdout.split()) if n)
     pin = tag_num((read_json(pin_file()) or {}).get("pin") or "")
     cand = [n for n in tags if pin is None or n <= pin]
-    if not cand or cand[-1] <= VERSION:
+    # same VERSION off the tag: an own PR squash-merged, .dpcli still on its branch commit — move to the release
+    on_tag = cand and run("git", "rev-parse", "HEAD", cwd=dist).stdout == \
+        run("git", "rev-parse", f"v{cand[-1]}^{{commit}}", cwd=dist).stdout
+    if not cand or cand[-1] < VERSION or (cand[-1] == VERSION and on_tag):
         if not a.check and run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
             # the version is current but .claude/ is not (dpcli changed in place, or init never ran): re-render
             h, err = render_and_commit(root, f"dpcli v{VERSION}")
