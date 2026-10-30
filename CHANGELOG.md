@@ -1,5 +1,8 @@
 # Changelog
 
+## 30
+- `accept` scope check ignores submodule pointers: a copy's `.dpcli` checkout drifts from the recorded commit and gave a false `outside scope: .dpcli`.
+
 ## 29
 - CLAUDE.md block: after a merge — `gc --remove` (merged copies and branches); sessions left merged branches behind.
 
