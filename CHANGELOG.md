@@ -1,5 +1,8 @@
 # Changelog
 
+## 31
+- `merge --into <branch>` when no copy has the branch open (e.g. the main copy cannot switch to `main`: a vendored `.dpcli` there, the submodule on the feature branch): a fast-forward moves the ref without a checkout (`update-ref` with the old value); a diverged target is refused with the hint to merge it into the source first.
+
 ## 30
 - `update` moves `.dpcli` to the release tag when it already has the release's VERSION but sits on another commit (an own PR squash-merged, the branch commit still checked out); it used to report "up to date" and commit the pointer at the branch commit.
 
