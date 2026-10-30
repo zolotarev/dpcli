@@ -56,9 +56,10 @@ def cmd_update(a):
             return
         st.parent.mkdir(parents=True, exist_ok=True)
         st.write_text(today + "\n")
-    lines = check_prs()  # first: a merged PR's branch is dropped, so the update below is not skipped on it
+    lines = []
     if not a.prs_only:
-        lines = update_dist(a) + lines
+        lines += update_dist(a)
+    lines += check_prs()
     if lines:
         print("\n".join(lines))
 
@@ -128,8 +129,7 @@ def check_prs():
     for fid, c in todo.items():
         url = c["pr"]
         kind = "pr" if "/pull/" in url else "issue"
-        r = run("gh", kind, "view", url, "--json", "state,labels,comments" + (",headRefOid" if kind == "pr" else ""),
-                timeout=20)
+        r = run("gh", kind, "view", url, "--json", "state,labels,comments", timeout=20)
         try:
             info = json.loads(r.stdout)
         except (json.JSONDecodeError, TypeError):
@@ -142,29 +142,12 @@ def check_prs():
         if state == "MERGED" or (kind == "issue" and state == "CLOSED" and "rejected" not in labels):
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "fix", "where": f"dpcli (merged {url})", "pr": url})
             out.append(f"{tag} merged → {fid} fixed (remove temporary workarounds marked until: {url})")
-            out += drop_branches(fid, info.get("headRefOid"))
         elif state == "CLOSED" or "rejected" in labels:
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "rejected", "why": why})
             out.append(f"{tag} rejected → {fid}: {why or 'see the PR'} — drop it or solve in .dpcli-local/ (harness-retro)")
         elif "rework" in labels and c["status"] != "rework":
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "rework", "why": why})
             out.append(f"{tag} rework → {fid}: {why or 'see the review'} — rework on its improve/* branch or drop (harness-retro)")
-    return out
-
-
-def drop_branches(fid, head):
-    """Local improve/<fid>-* branches whose tip is the merged PR's head: their work is in main (squash merges are
-    not ancestors, hence the tip check); a branch with other commits is kept."""
-    dist = reexec.DIST_DIR
-    out = []
-    for br in run("git", "branch", "--format=%(refname:short)", "--list", f"improve/{fid}-*", cwd=dist).stdout.split():
-        if not head or run("git", "rev-parse", br, cwd=dist).stdout.strip() != head:
-            continue
-        if run("git", "branch", "--show-current", cwd=dist).stdout.strip() == br and \
-                run("git", "checkout", "-q", "--detach", cwd=dist).returncode:
-            continue
-        if not run("git", "branch", "-q", "-D", br, cwd=dist).returncode:
-            out.append(f"  removed {br} (merged)")
     return out
 
 
