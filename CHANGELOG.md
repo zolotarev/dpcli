@@ -1,5 +1,9 @@
 # Changelog
 
+## 32
+- `deliver` keeps the module's frictions (`harness:` notes, `dp_feedback`, review `harness`): before it drops the journal they go to the ledger as `item` records, and `feedback`/`stats` read them from there — they used to vanish with the journal.
+- `decisions.md` / `summary.md` link the module plan in `related` only if the plan file exists (`docs check` reported a missing file for modules without one).
+
 ## 31
 - `merge --into <branch>` when no copy has the branch open (e.g. the main copy cannot switch to `main`: a vendored `.dpcli` there, the submodule on the feature branch): a fast-forward moves the ref without a checkout (`update-ref` with the old value); a diverged target is refused with the hint to merge it into the source first.
 
