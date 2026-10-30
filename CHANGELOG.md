@@ -1,5 +1,8 @@
 # Changelog
 
+## 29
+- `templates/workflow.md` loses restated or self-evident lines (card checks, init skip rule, subagent hint, `--why` aside); no behaviour change.
+
 ## 28
 - Hook `UserPromptSubmit` (`hooks/context_guard.py`, installed by `init`): when the main session's last turn is over `$DPCLI_CONTEXT_MAX` (300k) tokens, one line asks to finish the step and start a new session — a long main session re-reads its context on every turn and cost more than all the agents it ran.
 - `stats --tokens` adds the main sessions' context tokens (all modules, `--since` applies).
