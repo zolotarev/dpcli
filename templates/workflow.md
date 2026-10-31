@@ -85,7 +85,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 ## Documentation
 - Entry — `{{docs_dir}}/INDEX.md`. Find — `{{cli}} docs find <words>`, `{{cli}} docs findings <words>`, module journals — `{{cli}} search <text>` (`--sem` — by meaning, if enabled).
 - Read by section, not whole: `{{cli}} docs section <path>` — table of contents, `{{cli}} docs section <path> <number|heading start>` — a section.
-- Every md has frontmatter (`type`, `status`, `module`, `updated`, `summary`, `related`); new — `{{cli}} docs init`; `summary` — the conclusion/purpose in one line ≤ 140 chars (not TODO).
+- Every md has frontmatter (`type`, `status`, `module`, `updated`, `summary`, `related`); new — `{{cli}} docs init`; `summary` — the conclusion/purpose in one line ≤ 140 chars.
 - Document size ≤ `docs.max_kb` (40 KB): larger — split into section files or move data out; before commit — `{{cli}} docs check`, registries — `{{cli}} docs index`.
 - Finished work — one line in `registry/findings.md` (module section): the conclusion with numbers and a `path#section` link.
 
@@ -117,7 +117,6 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 Every turn pays for the whole session context again.
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
 - With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
-- Subagents — only when needed (protocol, waves).
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
