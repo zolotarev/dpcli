@@ -25,6 +25,34 @@ class Gc(unittest.TestCase):
         self.assertRegex(out, r"skip ta .*symlinks from other copies")
         self.assertIn("tb @", out)
 
+    def test_squash_merged(self):
+        """A branch squash-merged into main (and a branch merged into it) is removable; an unmerged one is not."""
+        p = Project()
+        self.addCleanup(p.cleanup)
+        r = p.root
+        mod, task = p.copies / "mod", p.copies / "task"
+        git("worktree", "add", "-q", "-b", "fm", str(mod), "main", cwd=r)
+        git("worktree", "add", "-q", "-b", "fm-t", str(task), "fm", cwd=r)
+        (task / "t.txt").write_text("t")
+        p.commit_all("t", cwd=task)
+        git("merge", "-q", "--no-ff", "-m", "m t", "fm-t", cwd=mod)
+        (mod / "j.txt").write_text("j")
+        p.commit_all("j", cwd=mod)
+        git("branch", "other", "main", cwd=r)
+        (r / "o.txt").write_text("o")
+        p.commit_all("o")  # main moves on before the squash
+        git("merge", "-q", "--squash", "fm", cwd=r)
+        git("commit", "-q", "-m", "squash fm", cwd=r)
+        git("checkout", "-q", "other", cwd=r)
+        (r / "x.txt").write_text("x")
+        p.commit_all("x")
+        git("checkout", "-q", "main", cwd=r)
+        out = p.ok("gc", "--remove")
+        self.assertIn("removed fm @", out)
+        self.assertIn("removed fm-t @", out)
+        self.assertNotIn("other", out)
+        self.assertNotIn("fm", git("branch", "--format=%(refname:short)", cwd=r).split())
+
 
 if __name__ == "__main__":
     unittest.main()

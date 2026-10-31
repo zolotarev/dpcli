@@ -199,10 +199,28 @@ def remove_copy(path):
     return None, ign
 
 
+def squash_merged(main, merged):
+    """Local branches squash-merged into main (their whole diff is one commit there), plus branches merged into those."""
+    rest = [b for b in gitx.local_branches() if b != main and b not in merged]
+    out = set()
+    for b in rest:
+        base = gitx.gitr("merge-base", main, b).stdout.strip()
+        if not base:
+            continue
+        tmp = gitx.gitr("commit-tree", f"{b}^{{tree}}", "-p", base, "-m", "gc").stdout.strip()
+        if tmp and gitx.gitr("cherry", main, tmp).stdout.startswith("-"):
+            out.add(b)
+    out |= {b for b in rest if b not in out and any(
+        gitx.gitr("merge-base", "--is-ancestor", b, s).returncode == 0 for s in out)}
+    return [b for b in rest if b in out]
+
+
 def cmd_gc(a):
     main = config.main_branch()
     main_tip = gitx.gitr("rev-parse", main).stdout.strip()
     merged = [b for b in gitx.gitr("branch", "--merged", main, "--format=%(refname:short)").stdout.split() if b != main]
+    squashed = squash_merged(main, merged)
+    merged += squashed
     here = str(gitx.toplevel())
     wt = {b: p for p, b in gitx.worktrees()}
     n = 0
@@ -236,7 +254,7 @@ def cmd_gc(a):
             if why_not:
                 print(f"skip {label}: {why_not}")
                 continue
-        r = gitx.gitr("branch", "-d", b)
+        r = gitx.gitr("branch", "-D" if b in squashed else "-d", b)
         print((f"removed {label}" + (f" (with ignored: {', '.join(ign[:4])})" if path and ign else ""))
               if r.returncode == 0 else f"copy removed, branch {b} kept: {gitx.gerr(r)}")
         n += 1
