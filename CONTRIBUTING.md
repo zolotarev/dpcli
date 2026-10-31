@@ -8,7 +8,7 @@ In a project that uses dpcli:
 
 1. Frictions are logged as you work: `dp_feedback` in executor reports, `harness: …` notes by the coordinator and main session.
 2. `dpcli feedback` groups them into clusters; `harness-retro` decides per cluster whether it is a **project** matter (fixed in the project's `.dpcli-local/`) or a **dpcli** matter.
-3. A dpcli fix is made in the `.dpcli` submodule on a branch `improve/<F-n>-<slug>`: a test reproducing the friction first, then the change, `VERSION` +1 and a `CHANGELOG.md` line.
+3. A dpcli fix is made in the `.dpcli` submodule on a branch `improve/<F-n>-<slug>` (`dpcli contribute` makes it from uncommitted edits): a test reproducing the friction first, then the change, `VERSION` +1 and a `CHANGELOG.md` line.
 4. `dpcli contribute F-n` opens the pull request — from `origin` if you can push, otherwise from your fork — or, if a similar one is already open, adds a `+1` with your evidence instead of a duplicate.
 
 Texts sent here are **anonymized**: no project names, paths, people or quotes — only what hurt, how often, and the proposed change.

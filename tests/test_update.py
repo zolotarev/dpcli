@@ -79,6 +79,19 @@ class Update(unittest.TestCase):
         self.assertIn(f"dpcli v{n}", git("log", "-1", "--format=%s", cwd=self.p.root))
         self.assertIn("up to date", self.p.ok("update", env=self.env))
 
+    def test_dpcli_sits_on_main_and_stale_remote_branches_go(self):
+        d = self.p.root / ".dpcli"
+        self.p.ok("update", env=self.env)  # up to date, detached on its tag → branch main
+        self.assertEqual(git("branch", "--show-current", cwd=d), "main")
+        git("push", "-q", "origin", "main:improve/F-9-gone", cwd=self.src)
+        git("fetch", "-q", "origin", cwd=d)
+        git("push", "-q", "origin", ":improve/F-9-gone", cwd=self.src)
+        self.release(self.v0 + 1)
+        self.p.ok("update", env=self.env)
+        self.assertEqual(git("branch", "--show-current", cwd=d), "main")
+        self.assertEqual(git("rev-parse", "main", cwd=d), git("rev-parse", f"v{self.v0 + 1}^{{commit}}", cwd=d))
+        self.assertNotIn("F-9-gone", git("branch", "-r", cwd=d))
+
     def test_current_version_but_stale_claude_is_rerendered(self):
         (self.p.root / ".claude" / "dpcli-workflow.md").unlink()
         self.p.commit_all("lost the rendered workflow")
@@ -146,10 +159,12 @@ class Update(unittest.TestCase):
         self.p.ok("module", "init", "web", "--code", "WB")
         self.p.ok("feedback", "new", "Slow accept", "--match", "accept", "--scope", "dpcli")
         self.p.ok("feedback", "new", "Plan sections", "--match", "plan", "--scope", "dpcli")
+        self.p.ok("feedback", "new", "Closed one", "--match", "zzz", "--scope", "dpcli")
         led = self.p.root / ".dpcli-local" / "feedback.jsonl"
         with open(led, "a") as f:
             f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-1", "kind": "pr", "url": "https://github.com/o/r/pull/1"}) + "\n")
             f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-2", "kind": "pr", "url": "https://github.com/o/r/pull/2"}) + "\n")
+            f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-3", "kind": "pr", "url": "https://github.com/o/r/pull/3"}) + "\n")
         bin_ = self.p.tmp / "bin"
         bin_.mkdir()
         gh = bin_ / "gh"
@@ -157,9 +172,18 @@ class Update(unittest.TestCase):
         gh.chmod(gh.stat().st_mode | stat.S_IEXEC)
         states = {"1": {"state": "MERGED", "labels": [], "comments": []},
                   "2": {"state": "OPEN", "labels": [{"name": "rework"}],
-                        "comments": [{"body": "VERDICT: rework\n- no test reproduces the friction", "url": "c2"}]}}
+                        "comments": [{"body": "VERDICT: rework\n- no test reproduces the friction", "url": "c2"}]},
+                  "3": {"state": "CLOSED", "labels": [{"name": "rejected"}], "comments": []}}
         env = {**self.env, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_PR": json.dumps(states)}
+        d = self.p.root / ".dpcli"
+        git("branch", "improve/F-2-plan", cwd=d)
+        git("branch", "improve/F-3-closed", cwd=d)
+        git("switch", "-q", "-c", "improve/F-1-slow", cwd=d)  # still on the merged PR's branch: update would skip forever
         out = self.p.ok("update", "--prs-only", env=env)
+        branches = git("branch", "--format=%(refname:short)", cwd=d)
+        self.assertNotIn("improve/F-1-slow", branches)  # merged: gone
+        self.assertIn("improve/F-2-plan", branches)  # rework: kept
+        self.assertIn("improve/F-3-closed", branches)  # closed unmerged: may be the only copy, kept
         self.assertIn("pull/1 merged → F-1 fixed", out)
         self.assertIn("pull/2 rework", out)
         self.assertIn("no test reproduces the friction", out)

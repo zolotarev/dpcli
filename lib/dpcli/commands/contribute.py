@@ -42,11 +42,24 @@ def cmd_contribute(a):
         raise DpError(f"{dist} is not a git repository (install dpcli as a submodule)")
     run("git", "fetch", "-q", "origin", cwd=dist)
     branch = run("git", "branch", "--show-current", cwd=dist).stdout.strip()
-    commits = run("git", "log", "--format=%s", "origin/main..HEAD", cwd=dist).stdout.split("\n")
-    commits = [x for x in commits if x.strip()]
-    if commits and not branch.startswith(f"improve/{a.id}-"):  # the current branch is pushed: another cluster's otherwise
-        raise DpError(f"commit the change on a branch improve/{a.id}-<slug>: git -C .dpcli switch -c improve/{a.id}-<slug>")
     title = a.title or c["title"]
+    log = lambda: [x for x in run("git", "log", "--format=%s", "origin/main..HEAD", cwd=dist).stdout.split("\n") if x.strip()]
+    if log() and not branch.startswith(f"improve/{a.id}-"):  # the current branch is pushed: another cluster's otherwise
+        raise DpError(f"commits on {branch or 'a detached HEAD'} are not {a.id}'s: move them to a branch improve/{a.id}-<slug> "
+                      f"(or leave {a.id}'s edits uncommitted on main: {CLI} contribute {a.id} makes the branch)")
+    if run("git", "status", "--porcelain", cwd=dist).stdout.strip():  # edits left uncommitted: branch and commit here
+        if not branch.startswith(f"improve/{a.id}-"):
+            branch = f"improve/{a.id}-" + (re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40] or "fix")
+            r = run("git", "switch", "-q", "-c", branch, cwd=dist)
+            if r.returncode:
+                raise DpError(f"git switch -c {branch}: {r.stderr.strip()}")
+        run("git", "add", "-A", cwd=dist)
+        r = run("git", "commit", "-q", "-m", title, cwd=dist)
+        if r.returncode:
+            raise DpError(f"git commit in .dpcli: {(r.stderr or r.stdout).strip()}")
+        files = run("git", "show", "--name-only", "--format=", "HEAD", cwd=dist).stdout.split()
+        print(f"{a.id}: committed on {branch}: {' '.join(files)}")
+    commits = log()
     by_c, _ = assign(items(), {a.id: c})
     group = by_c.get(a.id, [])
     ntasks = len({i["task"] for i in group if i["task"]})
@@ -114,8 +127,12 @@ def open_pr(repo, dist, branch, title, body):
     return r.stdout.strip().splitlines()[-1]
 
 
+def outbox(fid):
+    return config.repo_path(config.get("checks.log_dir", "build/dpcli")) / f"contribute-{fid}"
+
+
 def offline(fid, title, body, commits, dist):
-    out = config.repo_path(config.get("checks.log_dir", "build/dpcli")) / f"contribute-{fid}"
+    out = outbox(fid)
     out.mkdir(parents=True, exist_ok=True)
     (out / "issue.md").write_text(f"# {title}\n\n{body}", encoding="utf-8")
     if commits:
@@ -127,6 +144,7 @@ def offline(fid, title, body, commits, dist):
 
 def record(fid, kind, url):
     append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": kind, "url": url})
+    shutil.rmtree(outbox(fid), ignore_errors=True)  # sent: no longer reported by update as waiting
 
 
 def register(sp):
