@@ -110,6 +110,15 @@ class Contribute(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("improve/F-1-", err)
 
+    def test_uncommitted_edits_get_their_branch_and_commit(self):
+        # agents may run dpcli but not git in .dpcli: contribute makes the improve/* branch and the commit itself
+        (self.dist / "x.txt").write_text("x")
+        out = self.p.ok("contribute", "F-1", env=self.env)
+        self.assertIn("pull/12", out)
+        self.assertEqual(git("branch", "--show-current", cwd=self.dist), "improve/F-1-long-accept-blocks-the-agent")
+        self.assertEqual(git("log", "-1", "--format=%s", cwd=self.dist), "Long accept blocks the agent")
+        self.assertIn("improve/F-1-long-accept-blocks-the-agent", git("ls-remote", str(self.origin), cwd=self.dist))
+
     def test_no_gh_writes_patch(self):
         self.improve()
         nogh = self.p.tmp / "nogh"
@@ -122,6 +131,10 @@ class Contribute(unittest.TestCase):
         d = self.p.root / "build" / "dpcli" / "contribute-F-1"
         self.assertTrue((d / "issue.md").is_file())
         self.assertTrue(list(d.glob("*.patch")))
+        self.assertIn("F-1 not sent to the dpcli hub", self.p.ok("update", "--prs-only", env=env))  # the user sees it
+        self.p.ok("contribute", "F-1", env=self.env)
+        self.assertFalse(d.exists())
+        self.assertNotIn("not sent", self.p.ok("update", "--prs-only", env=self.env))
 
 
 if __name__ == "__main__":

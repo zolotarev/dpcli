@@ -12,6 +12,6 @@ Cheap: one session, no subagents, only the commands below. Don't read project co
 3. **Propose to the user** as one list, ≤ 3 items, most frequent/expensive first: `F-n ×count [scope] → change (file) → gain/cost`. Change nothing without approval.
 4. **Apply the approved.**
    - project: edit `.dpcli-local/` (`workflow.md`, `claude-md.md`, `agents/<name>.append.md`, `skills/`), `{{cli}} init`, commit `.dpcli-local/ .claude/ CLAUDE.md`, then `{{cli}} feedback fix F-n --where .dpcli-local/<file>`;
-   - dpcli: in `.dpcli` — `git -C .dpcli switch -c improve/F-n-<slug>`, a test reproducing the friction, the change, `VERSION` +1, a `CHANGELOG.md` line, commit, then `{{cli}} contribute F-n` (PR from origin or a fork, or a +1 on a similar open one). If it hurts now, add a temporary workaround in `.dpcli-local/` marked `until: <PR url>`. `dpcli update` reports the verdict later.
+   - dpcli: in `.dpcli` — a test reproducing the friction, the change, `VERSION` +1, a `CHANGELOG.md` line, then `{{cli}} contribute F-n` — it makes the `improve/F-n-*` branch, the commit and a PR (origin or a fork), or a +1 on a similar open one. If it hurts now, add a temporary workaround in `.dpcli-local/` marked `until: <PR url>`. `dpcli update` reports the verdict later.
    - rejected by the user — `{{cli}} feedback wontfix F-n --why "…"`.
 5. **Record.** `{{cli}} decide harness "<change>" --by user --why "F-n"` per decision.

@@ -9,6 +9,7 @@ import sys
 
 from .. import VERSION, config, gitx, reexec
 from ..util import CLI, append_jsonl, lang_commit, now, read_json, short, write_json
+from .contribute import outbox
 from .feedback import ledger, ledger_path
 
 GENERATED = [".dpcli", ".claude/agents", ".claude/skills", ".claude/.dpcli-manifest.json", ".claude/settings.json", "CLAUDE.md"]
@@ -56,10 +57,10 @@ def cmd_update(a):
             return
         st.parent.mkdir(parents=True, exist_ok=True)
         st.write_text(today + "\n")
-    lines = []
+    lines = check_prs()  # first: a merged PR frees .dpcli from its improve/* branch before the update
     if not a.prs_only:
         lines += update_dist(a)
-    lines += check_prs()
+    lines += unsent()
     if lines:
         print("\n".join(lines))
 
@@ -76,9 +77,9 @@ def update_dist(a):
     br = run("git", "branch", "--show-current", cwd=dist).stdout.strip()
     if br and br != "main":
         return [f"update: skipped — .dpcli is on {br} (finish it: {CLI} contribute)"]
-    if run("git", "fetch", "-q", "--tags", "origin", cwd=dist, timeout=15).returncode:
+    if run("git", "fetch", "-q", "--prune", "--tags", "origin", cwd=dist, timeout=15).returncode:
         return ["update: offline, skipped"]
-    if br == "main" and run("git", "log", "--oneline", "origin/main..HEAD", cwd=dist).stdout.strip():
+    if run("git", "log", "--oneline", "origin/main..main", cwd=dist).stdout.strip():  # -B main below would drop them
         return ["update: skipped — local commits on .dpcli main: move them to improve/* and contribute"]
     tags = sorted(n for n in map(tag_num, run("git", "tag", "-l", "v*", cwd=dist).stdout.split()) if n)
     pin = tag_num((read_json(pin_file()) or {}).get("pin") or "")
@@ -87,6 +88,8 @@ def update_dist(a):
     on_tag = cand and run("git", "rev-parse", "HEAD", cwd=dist).stdout == \
         run("git", "rev-parse", f"v{cand[-1]}^{{commit}}", cwd=dist).stdout
     if not cand or cand[-1] < VERSION or (cand[-1] == VERSION and on_tag):
+        if not a.check and not br and on_tag:
+            run("git", "checkout", "-q", "-B", "main", cwd=dist)  # the release as branch main, not a detached tag
         if not a.check and run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
             # the version is current but .claude/ is not (dpcli changed in place, or init never ran): re-render
             h, err = render_and_commit(root, f"dpcli v{VERSION}")
@@ -99,7 +102,7 @@ def update_dist(a):
     target = cand[-1]
     if a.check:
         return [f"dpcli v{VERSION} → v{target} available: {CLI} update"]
-    r = run("git", "checkout", "-q", f"v{target}", cwd=dist)
+    r = run("git", "checkout", "-q", "-B", "main", f"v{target}", cwd=dist)
     if r.returncode:
         return [f"update: checkout v{target} failed: {r.stderr.strip()}"]
     h, err = render_and_commit(root, f"dpcli v{target}")
@@ -142,6 +145,8 @@ def check_prs():
         verdict = next((x.get("body", "") for x in reversed(info.get("comments") or []) if "VERDICT:" in x.get("body", "")), "")
         why = short(" ".join(l.strip("- ") for l in verdict.splitlines()[1:] if l.strip()), 200)
         tag = url.rstrip("/").rsplit("/", 2)[-2] + "/" + url.rstrip("/").rsplit("/", 1)[-1]
+        if state in ("MERGED", "CLOSED") or "rejected" in labels:
+            drop_branches(fid)
         if state == "MERGED" or (kind == "issue" and state == "CLOSED" and "rejected" not in labels):
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "fix", "where": f"dpcli (merged {url})", "pr": url})
             out.append(f"{tag} merged → {fid} fixed (remove temporary workarounds marked until: {url})")
@@ -152,6 +157,23 @@ def check_prs():
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "rework", "why": why})
             out.append(f"{tag} rework → {fid}: {why or 'see the review'} — rework on its improve/* branch or drop (harness-retro)")
     return out
+
+
+def drop_branches(fid):
+    """The PR is merged or rejected: its local improve/<fid>-* branch is done (-D: a squash merge is not an ancestor)."""
+    dist = reexec.DIST_DIR
+    for b in run("git", "for-each-ref", "--format=%(refname:short)", f"refs/heads/improve/{fid}-*", cwd=dist).stdout.split():
+        if b == run("git", "branch", "--show-current", cwd=dist).stdout.strip():
+            if run("git", "status", "--porcelain", cwd=dist).stdout.strip():
+                continue
+            run("git", "checkout", "-q", "--detach", cwd=dist)
+        run("git", "branch", "-q", "-D", b, cwd=dist)
+
+
+def unsent():
+    """Contributions written to disk because gh was not logged in: the user sees them until they are sent."""
+    return [f"{x.name[11:]} not sent to the dpcli hub (gh not logged in): gh auth login, then {CLI} contribute {x.name[11:]}"
+            for x in sorted(outbox("").parent.glob("contribute-F-*")) if x.is_dir()]
 
 
 def register(sp):
