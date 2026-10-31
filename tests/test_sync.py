@@ -99,7 +99,7 @@ class Sync(unittest.TestCase):
 
     def test_symlinked_changelog_is_not_written_through(self):
         self.pr({sync.INIT: INIT.format(30), sync.LOG: LOG.format("## 30\n- mine.\n\n")})
-        self.main_moves({sync.INIT: INIT.format(30), sync.LOG: LOG.format("## 30\n- x.\n\n")})
+        self.main_moves({sync.INIT: INIT.format(31)})  # VERSION collides, CHANGELOG.md merges in as the PR's symlink
         git("switch", "-q", "pr", cwd=self.base)
         os.remove(self.base / sync.LOG)
         os.symlink("/etc/hostname", self.base / sync.LOG)
