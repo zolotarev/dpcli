@@ -77,7 +77,12 @@ def main(pr):
         state = tests_state(pr)
         if state == "success":
             gh("pr", "edit", pr, "--remove-label", "rework", check=False)
-            gh("pr", "merge", pr, "--squash", "--delete-branch")
+            r = subprocess.run(["gh", "pr", "merge", pr, "--squash", "--delete-branch"], capture_output=True, text=True)
+            if r.returncode:  # main moved during the review: a push re-syncs (tools/sync.py) and re-reviews
+                gh("pr", "comment", pr, "--body", f"VERDICT: rework\n- Accepted, but the merge failed ({r.stderr.strip()[:200]}): "
+                   "main moved during the review; push again (or merge main) to re-sync and re-review.")
+                label(pr, "rework", ["rejected"])
+                return print(f"#{pr}: merge failed")
             tag = release()
             return print(f"#{pr}: merged" + (f", released {tag}" if tag else ""))
         gh("pr", "comment", pr, "--body", f"Review accepted, but the `test` workflow is {state}: fix and push again.")

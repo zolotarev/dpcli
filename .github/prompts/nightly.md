@@ -17,9 +17,3 @@ In order of value:
 ## Deliver
 1. `git switch -c nightly/<run id>`; make the change; `python3 -m unittest discover -s tests`; `python3 tools/metrics.py --write-budgets` (budgets go down to the new values); bump `VERSION` in `lib/dpcli/__init__.py`; add a `## <N>` CHANGELOG section with one line.
 2. Commit, `git push -u origin HEAD`, `gh label create nightly-simplify --color 5319E7` (ignore "exists"), then `gh pr create --base main --label nightly-simplify --title "nightly: <what got smaller>" --body "<before → after numbers from metrics; what was removed and why behaviour is unchanged>"`.
-
-## Rework (when the task names an open nightly PR)
-1. `gh pr view <N> --json comments` — the latest `VERDICT:` comment by github-actions lists what to fix; `gh pr diff <N>`.
-2. `git fetch origin && git switch <branch> && git merge origin/main` (resolve conflicts by keeping main's behaviour).
-3. Fix every item of the verdict — or, if an item asks to restore something, restore it. Same rules: behaviour unchanged, tests green, `python3 tools/metrics.py --write-budgets` (budgets only go down), VERSION is main's + 1, one CHANGELOG line that is true.
-4. Commit and `git push`; the PR updates. Don't open a new PR.
