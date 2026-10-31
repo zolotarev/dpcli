@@ -43,6 +43,10 @@ def cmd_contribute(a):
     run("git", "fetch", "-q", "origin", cwd=dist)
     branch = run("git", "branch", "--show-current", cwd=dist).stdout.strip()
     title = a.title or c["title"]
+    log = lambda: [x for x in run("git", "log", "--format=%s", "origin/main..HEAD", cwd=dist).stdout.split("\n") if x.strip()]
+    if log() and not branch.startswith(f"improve/{a.id}-"):  # the current branch is pushed: another cluster's otherwise
+        raise DpError(f"commits on {branch or 'a detached HEAD'} are not {a.id}'s: move them to a branch improve/{a.id}-<slug> "
+                      f"(or leave {a.id}'s edits uncommitted on main: {CLI} contribute {a.id} makes the branch)")
     if run("git", "status", "--porcelain", cwd=dist).stdout.strip():  # edits left uncommitted: branch and commit here
         if not branch.startswith(f"improve/{a.id}-"):
             branch = f"improve/{a.id}-" + (re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40] or "fix")
@@ -53,11 +57,9 @@ def cmd_contribute(a):
         r = run("git", "commit", "-q", "-m", title, cwd=dist)
         if r.returncode:
             raise DpError(f"git commit in .dpcli: {(r.stderr or r.stdout).strip()}")
-    commits = run("git", "log", "--format=%s", "origin/main..HEAD", cwd=dist).stdout.split("\n")
-    commits = [x for x in commits if x.strip()]
-    if commits and not branch.startswith(f"improve/{a.id}-"):  # the current branch is pushed: another cluster's otherwise
-        raise DpError(f"commits on {branch or 'a detached HEAD'} are not {a.id}'s: move them to a branch improve/{a.id}-<slug> "
-                      f"(or leave {a.id}'s edits uncommitted: {CLI} contribute {a.id} makes the branch)")
+        files = run("git", "show", "--name-only", "--format=", "HEAD", cwd=dist).stdout.split()
+        print(f"{a.id}: committed on {branch}: {' '.join(files)}")
+    commits = log()
     by_c, _ = assign(items(), {a.id: c})
     group = by_c.get(a.id, [])
     ntasks = len({i["task"] for i in group if i["task"]})

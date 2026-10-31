@@ -2,7 +2,7 @@
 
 ## 34
 - `contribute` makes the `improve/F-n-*` branch and the commit from uncommitted edits in `.dpcli`: agents may run dpcli but not git there, so a friction stopped on a permission.
-- `update` keeps `.dpcli` on branch `main` at the release (not a detached tag next to a lagging local `main`), prunes deleted hub branches, and drops the local `improve/F-n-*` branch of a merged or rejected PR (one left checked out blocked every later update).
+- `update` keeps `.dpcli` on branch `main` at the release (not a detached tag next to a lagging local `main`), prunes deleted hub branches, and drops the local `improve/F-n-*` branch of a merged PR (one left checked out blocked every later update).
 - `update` lists contributions written to disk because `gh` was not logged in, until they are sent.
 
 ## 33

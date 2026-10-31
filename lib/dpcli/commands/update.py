@@ -145,7 +145,7 @@ def check_prs():
         verdict = next((x.get("body", "") for x in reversed(info.get("comments") or []) if "VERDICT:" in x.get("body", "")), "")
         why = short(" ".join(l.strip("- ") for l in verdict.splitlines()[1:] if l.strip()), 200)
         tag = url.rstrip("/").rsplit("/", 2)[-2] + "/" + url.rstrip("/").rsplit("/", 1)[-1]
-        if state in ("MERGED", "CLOSED") or "rejected" in labels:
+        if state == "MERGED":  # rejected/closed: the branch may be the only copy, harness-retro may rework it
             drop_branches(fid)
         if state == "MERGED" or (kind == "issue" and state == "CLOSED" and "rejected" not in labels):
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "fix", "where": f"dpcli (merged {url})", "pr": url})
@@ -160,7 +160,7 @@ def check_prs():
 
 
 def drop_branches(fid):
-    """The PR is merged or rejected: its local improve/<fid>-* branch is done (-D: a squash merge is not an ancestor)."""
+    """The PR is merged: its local improve/<fid>-* branch is done (-D: a squash merge is not an ancestor)."""
     dist = reexec.DIST_DIR
     for b in run("git", "for-each-ref", "--format=%(refname:short)", f"refs/heads/improve/{fid}-*", cwd=dist).stdout.split():
         if b == run("git", "branch", "--show-current", cwd=dist).stdout.strip():
@@ -172,7 +172,8 @@ def drop_branches(fid):
 
 def unsent():
     """Contributions written to disk because gh was not logged in: the user sees them until they are sent."""
-    return [f"{x.name[11:]} not sent to the dpcli hub (gh not logged in): gh auth login, then {CLI} contribute {x.name[11:]}"
+    return [f"{x.name[11:]} not sent to the dpcli hub (gh not logged in; dpcli updates wait while .dpcli is on its branch): "
+            f"gh auth login, then {CLI} contribute {x.name[11:]}"
             for x in sorted(outbox("").parent.glob("contribute-F-*")) if x.is_dir()]
 
 
