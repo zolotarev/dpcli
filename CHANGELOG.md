@@ -1,8 +1,20 @@
 # Changelog
 
-## 29
-- `templates/workflow.md` loses restated or self-evident lines (card checks, init skip rule, subagent hint, `--why` aside); no behaviour change.
+## 33
+- `templates/workflow.md` loses two self-evident lines (subagent hint, `(not TODO)` aside); no behaviour change.
 
+## 32
+- `deliver` keeps the module's frictions (`harness:` notes, `dp_feedback`, review `harness`): before it drops the journal they go to the ledger as `item` records, and `feedback`/`stats` read them from there — they used to vanish with the journal.
+- `decisions.md` / `summary.md` link the module plan in `related` only if the plan file exists (`docs check` reported a missing file for modules without one).
+
+## 31
+- `merge --into <branch>` when no copy has the branch open (e.g. the main copy cannot switch to `main`: a vendored `.dpcli` there, the submodule on the feature branch): a fast-forward moves the ref without a checkout (`update-ref` with the old value); a diverged target is refused with the hint to merge it into the source first.
+
+## 30
+- `update` moves `.dpcli` to the release tag when it already has the release's VERSION but sits on another commit (an own PR squash-merged, the branch commit still checked out); it used to report "up to date" and commit the pointer at the branch commit.
+
+## 29
+- CLAUDE.md block: after a merge — `gc --remove` (merged copies and branches); sessions left merged branches behind.
 ## 28
 - Hook `UserPromptSubmit` (`hooks/context_guard.py`, installed by `init`): when the main session's last turn is over `$DPCLI_CONTEXT_MAX` (300k) tokens, one line asks to finish the step and start a new session — a long main session re-reads its context on every turn and cost more than all the agents it ran.
 - `stats --tokens` adds the main sessions' context tokens (all modules, `--since` applies).

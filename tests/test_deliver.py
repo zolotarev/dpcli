@@ -95,6 +95,19 @@ class Deliver(DeliverBase):
         ev = (copy / "docs/plan/pay/events.jsonl").read_text().splitlines()[-1]
         self.assertEqual(json.loads(ev)["ev"], "delivered")
 
+    def test_squash_keeps_frictions_once(self):
+        from dpcli.commands import feedback
+        self.cfg()
+        copy = self.module_copy()
+        with (copy / "docs/plan/pay/events.jsonl").open("a") as f:
+            f.write(json.dumps({"t": "2026-10-02T11:00:00", "by": "coordinator", "ev": "note",
+                                "note": "harness: zebra friction"}) + "\n")
+        sh("commit", "-q", "-am", "note", cwd=copy)
+        deliver.cmd_deliver(args(self.MOD))
+        zebra = [i for i in feedback.items() if "zebra" in i["text"]]
+        self.assertEqual(len(zebra), 1)  # the module copy still has the journal: ledger copy is not counted twice
+        self.assertIn("zebra", feedback.ledger_path().read_text())
+
     def test_squash_drops_journal_and_keeps_md(self):
         self._squash("en", ("Answer", "user"), "Why", "## Decisions", "checked")
 

@@ -6,14 +6,15 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 
 ## Roles
 - **User** — decisions, forks, acceptance of the result.
-- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan`, gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
+- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan` (`--why` is the reason; no reason — leave it empty, `decisions.md` will say "approved by the developer"), gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
 - **Module coordinator** (`dp-coordinator`) — contracts, task cards, launching executors, acceptance, gates. Does not write or review code.
 - **Executor** (`dpcli_role: executor`) — one task in its own copy and branch, within the card's bounds.
 - **Reviewer** (`dp-reviewer`) — fresh, empty context, one task; only reads and re-runs checks.
 
 ## Lifecycle
 1. Plan `{{plan_dir}}/<m>.md`: goal, user decisions, tasks with scope and acceptance, waves, stop conditions.
-2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor.3. Waves: ≤ 4 executors at once; task → card → copy and branch `<m>/<ID>` from `{{module_branch}}` → acceptance (see "Acceptance").
+2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor. Several modules of one feature — each its own branch from the same feature branch.
+3. Waves: ≤ 4 executors at once; task → card → copy and branch `<m>/<ID>` from `{{module_branch}}` → acceptance (see "Acceptance").
 4. Gate (stop condition or a fork outside the plan): `{{cli}} decide <m> "question" --ask` → main session asks the user → `answer`.
 5. User check → on approval `{{cli}} deliver <m>`: one squash commit into the module base (`--into` — another branch); of the journal only `decisions.md` and `summary.md` go there; the full journal stays in `{{module_branch}}` (and under an archive tag if `deliver.archive_tag` is set); plan and contracts get `status: closed`, `INDEX.md` is rebuilt. Don't develop the module branch after delivery. Feature branch into `{{main_branch}}` — only by the user's decision (usually an MR merged by a human); `deliver`/`merge` into `{{main_branch}}` — only with explicit `--into`.
 
@@ -41,6 +42,8 @@ The coordinator writes it so the executor has nothing to search for:
 - `accept` checks: `--test <filter>` or `--check <name> "<cmd>" "<expect>"` — executable, with thresholds;
 - interface contracts with versions (`--contract <name>@<version>`);
 - how to do it when not obvious — `task note` (files, functions, format, GPU/CPU lock, where data is).
+
+`task brief` refuses an incomplete card; `accept` checks that changed files are within `scope`.
 
 ## Contracts
 `{{contracts_dir}}/<m>.md` — per interface: owner and consumers, the exact interface (signatures, fields, units, axes, types, behaviour on missing data, invariants), version.
@@ -102,6 +105,7 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 ## Agent setup
 - dpcli agents — `.dpcli/agents/*.md` (Claude Code format + `dpcli_role: coordinator|executor|reviewer|status`, `dpcli_review: true|false`); `{{cli}} init` puts them into `.claude/agents/`.
 - Project changes live in the project layer `.dpcli-local/` (see its README), never in `.dpcli/` — the distribution is replaced on update: `agents/<name>.append.md` adds to a dpcli agent, `agents/<name>.md` is an own agent, `skills/<name>/`, `workflow.md` (project rules), `claude-md.md`. Then `{{cli}} init`.
+- `init` does not touch files it did not create: same-named files in `.claude/agents/` are skipped.
 - Attach your own agent to a role — `roles` in `dpcli.yml` (`name: {role: executor, review: true}`) or `dpcli_role` in its frontmatter; then it is valid in `task new --type`.
 - Role registry — `{{cli}} agents`.
 
