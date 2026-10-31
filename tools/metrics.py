@@ -3,7 +3,7 @@
 
   python3 tools/metrics.py                  # JSON to stdout
   python3 tools/metrics.py --check          # exit 1 if over tools/budgets.json (+ tolerance)
-  python3 tools/metrics.py --write-budgets  # set budgets to the current values (nightly shrink)
+  python3 tools/metrics.py --write-budgets  # lower budgets to the current values, never raise (nightly shrink)
 """
 import argparse
 import json
@@ -75,6 +75,13 @@ def over(m, b):
     return out
 
 
+def lowered(m, b):
+    """Budgets from measurement m, none above the old budgets b: a raise needs a justified PR, not a rewrite."""
+    out = {k: min(m[k], b.get(k, m[k])) for k in ("code_lines", "prompt_tokens", "prompt_max", "duplicate_windows")}
+    out["risky"] = {k: min(v, (b.get("risky") or {}).get(k, v)) for k, v in m["risky"].items()}
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
@@ -82,8 +89,7 @@ def main():
     a = ap.parse_args()
     m = measure()
     if a.write_budgets:
-        BUDGETS.write_text(json.dumps({k: m[k] for k in ("code_lines", "prompt_tokens", "prompt_max",
-                                                          "duplicate_windows", "risky")}, indent=2) + "\n")
+        BUDGETS.write_text(json.dumps(lowered(m, json.loads(BUDGETS.read_text())), indent=2) + "\n")
     if a.check:
         bad = over(m, json.loads(BUDGETS.read_text()))
         for b in bad:

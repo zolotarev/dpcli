@@ -14,7 +14,7 @@ flowchart LR
 
 ## Done
 - v4–v9: English and language settings, project layer `.dpcli-local/`, friction ledger (`feedback`, `stats`, `contribute`), auto-update, installer, fast tools.
-- Hub CI: tests, lightness budgets, AI review with verdict, automatic merge/rework/reject and release, nightly simplification (its own PRs reworked by the review).
+- Hub CI: tests, lightness budgets, AI review with verdict, automatic merge/rework/reject and release, PRs synced with main before review, nightly simplification (a nightly PR sent back for rework is replaced by a fresh one).
 - v10–v17: fixes from the first project's ledger — 8 of 10 friction clusters closed (155 of 186 reports): truncated addenda, plan sections, shared report files, false scope failures, long accept, lock output, job names, `git stash` rule.
 - v18: agents read less — `task show` carries the "General rules" section (≈460 instead of ≈3300 tokens of the process description); a re-review looks only at the previous issues and what changed since; one coordinator per wave.
 
