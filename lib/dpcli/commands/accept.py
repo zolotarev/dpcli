@@ -239,8 +239,9 @@ def scope_check(card, cwd, mod):
     hp = copies.hooks_dir(cwd)
     skip += [hp] if hp else []  # hooks dir (.husky/_) is copy setup, not task work
     globs = [str(g) for g in config.get("gc.ignore_globs") or []]
-    subs = {ln.split("\t", 1)[1] for ln in gitx.git("ls-files", "--stage", "--", *files, cwd=cwd).splitlines()
-            if ln.startswith("160000")} if files else set()  # a submodule pointer drifts with the copy's checkout
+    # a submodule pointer drifts with the copy's checkout; a deliberate pointer move also skips dont_touch
+    subs = {e.split("\t", 1)[1] for e in gitx.git("ls-files", "--stage", "-z", "--", *files, cwd=cwd).split("\0")
+            if e.startswith("160000")} if files else set()
     files = [f for f in files if f not in subs and not path_in(f, skip) and not any(fnmatch.fnmatch(f.rsplit("/", 1)[-1], g) for g in globs)
              and not any(f"/{d}/" in f"/{f}" for d in config.get("gc.ignore_dirs") or [])]
     dont = [p for x in card.get("dont_touch") or [] for p in _pat(x)]

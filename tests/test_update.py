@@ -113,6 +113,18 @@ class Update(unittest.TestCase):
         self.assertIn("improve/F-1-x", self.p.ok("update", env=self.env))
         self.assertEqual(self.head_version(), self.v0)
 
+    def test_same_version_off_the_tag_moves_to_the_tag(self):
+        # an own PR was squash-merged: .dpcli sits on the branch commit with the release's VERSION, not on the tag
+        d = self.p.root / ".dpcli"
+        v = d / "lib/dpcli/__init__.py"
+        v.write_text(re.sub(r"VERSION = \d+", f"VERSION = {self.v0 + 1}", v.read_text()))
+        git("commit", "-q", "-am", "improve", cwd=d)
+        self.release(self.v0 + 1)
+        out = self.p.ok("update", env=self.env)
+        self.assertIn(f"v{self.v0 + 1}", out)
+        self.assertEqual(git("rev-parse", "HEAD", cwd=d), git("rev-parse", f"v{self.v0 + 1}^{{commit}}", cwd=d))
+        self.assertIn(".dpcli", git("show", "--stat", "HEAD", cwd=self.p.root))  # the pointer at the tag is committed
+
     def test_pin(self):
         self.release(self.v0 + 1)
         self.release(self.v0 + 2, "SECOND")

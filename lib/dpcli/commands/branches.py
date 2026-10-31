@@ -92,11 +92,20 @@ def cmd_merge(a):
         raise DpError(f"{br} is not a dpcli module or task branch: give --into <branch>")
     guard_main(into, bool(a.into))
     path = gitx.copy_of(into)
-    if not path:
-        raise DpError(f"branch {into} is not checked out anywhere: a copy with it open is needed")
-    subj = gitx.gitr("log", "-1", "--format=%s", br, "--").stdout.strip()
-    h, n, kind = gitx.do_merge(path, br, a.message or lang_commit(f"Merge {br}: {subj}", f"Слияние {br}: {subj}"), ff=False, trailers=a.trailer)
-    out = f"{into}: {br} already merged" if kind == "up-to-date" else f"{into} {h}: merged {br}, files {n}"
+    if not path:  # no copy can open it (e.g. a vendored .dpcli on main vs the submodule): a fast-forward needs none
+        old = gitx.gitr("rev-parse", f"refs/heads/{into}").stdout.strip()
+        if not old or gitx.gitr("merge-base", "--is-ancestor", old, br).returncode:
+            raise DpError(f"branch {into} is open in no copy and {br} is not a fast-forward of it: "
+                          f"merge {into} into {br} first, or open {into} in a copy")
+        r = gitx.gitr("update-ref", f"refs/heads/{into}", br, old)  # with the old value: no lost concurrent update
+        if r.returncode:
+            raise DpError(f"{into}: update-ref failed: {gitx.gerr(r)}")
+        kind = "up-to-date" if gitx.git("rev-parse", br) == old else "ff"
+        out = f"{into}: fast-forward to {br} ({gitx.git('rev-parse', '--short', br)}), no copy needed"
+    else:
+        subj = gitx.gitr("log", "-1", "--format=%s", br, "--").stdout.strip()
+        h, n, kind = gitx.do_merge(path, br, a.message or lang_commit(f"Merge {br}: {subj}", f"Слияние {br}: {subj}"), ff=False, trailers=a.trailer)
+        out = f"{into}: {br} already merged" if kind == "up-to-date" else f"{into} {h}: merged {br}, files {n}"
     if a.push:
         r = gitx.gitr("push", "origin", into, cwd=path)
         if r.returncode:
