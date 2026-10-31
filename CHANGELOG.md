@@ -1,5 +1,8 @@
 # Changelog
 
+## 33
+- `accept` scope check ignores submodule pointers: a copy's `.dpcli` checkout drifts from the recorded commit and gave a false `outside scope: .dpcli`.
+
 ## 32
 - `deliver` keeps the module's frictions (`harness:` notes, `dp_feedback`, review `harness`): before it drops the journal they go to the ledger as `item` records, and `feedback`/`stats` read them from there — they used to vanish with the journal.
 - `decisions.md` / `summary.md` link the module plan in `related` only if the plan file exists (`docs check` reported a missing file for modules without one).

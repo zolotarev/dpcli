@@ -70,6 +70,18 @@ class HonestScope(unittest.TestCase):
         self.assertEqual(code, 0, out)  # deliberate: merged-in files are not the task's; the note says what is unchecked
         self.assertIn("1 merge commit(s): conflict resolutions not checked", out)
 
+    def test_submodule_pointer_is_not_the_tasks_work(self):
+        # a copy's submodule checkout drifts from the recorded pointer (older distribution): not the task's change
+        tid, tc = self.task("--scope", "src/")
+        (tc / "src").mkdir()
+        (tc / "src" / "a.py").write_text("x", encoding="utf-8")
+        git("add", "src/a.py", cwd=tc)
+        git("update-index", "--add", "--cacheinfo", f"160000,{'a' * 40},vendor/lib", cwd=tc)
+        git("commit", "-q", "-m", "work and pointer", cwd=tc)
+        code, out, _ = self.p.run("accept", tid, cwd=tc)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("vendor/lib", out)
+
     def test_hint_tests_referencing_scope_files(self):
         f = self.mc / "src" / "billing.py"
         f.parent.mkdir(parents=True, exist_ok=True)
