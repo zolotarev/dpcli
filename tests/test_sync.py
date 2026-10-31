@@ -88,6 +88,27 @@ class Sync(unittest.TestCase):
         body = next(c[-1] for c in self.calls if c[:2] == ("pr", "comment"))
         self.assertTrue(body.startswith("VERDICT: rework\n"), body)  # dpcli update reads the reason from it
 
+    def test_fork_merging_cleanly_goes_to_review_unpushed(self):
+        self.pr({"lib/a.py": "x = 2\n"})
+        self.main_moves({"lib/b.py": "y = 1\n"})
+        sync.gh = lambda *a, **k: self.calls.append(a) or json.dumps({"headRefName": "pr", "isCrossRepository": True})
+        self.assertEqual(self.sync(), 0)
+        self.assertEqual([c for c in self.calls if c[0] != "pr"], [])  # no label, no test dispatch
+        git("fetch", "-q", "origin", cwd=self.base)
+        self.assertEqual(git("rev-parse", "origin/pr", cwd=self.base), git("rev-parse", "refs/pull/7/head", cwd=str(self.tmp / "origin.git")))
+
+    def test_symlinked_changelog_is_not_written_through(self):
+        self.pr({sync.INIT: INIT.format(30), sync.LOG: LOG.format("## 30\n- mine.\n\n")})
+        self.main_moves({sync.INIT: INIT.format(30), sync.LOG: LOG.format("## 30\n- x.\n\n")})
+        git("switch", "-q", "pr", cwd=self.base)
+        os.remove(self.base / sync.LOG)
+        os.symlink("/etc/hostname", self.base / sync.LOG)
+        git("commit", "-q", "-am", "link", cwd=self.base)
+        git("push", "-q", "-f", "origin", "HEAD:pr", "HEAD:refs/pull/7/head", cwd=self.base)
+        git("switch", "-q", "--detach", "origin/main", cwd=self.base)
+        self.assertIn("symlink", self.sync())
+        self.assertIn(("label", "7", "rework", ["rejected"]), self.calls)
+
     def test_up_to_date_does_nothing(self):
         self.pr({"lib/a.py": "x = 2\n"})
         self.assertEqual(self.sync(), 0)

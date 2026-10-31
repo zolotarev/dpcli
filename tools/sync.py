@@ -4,8 +4,8 @@ Parallel PRs always collide on VERSION and the top of CHANGELOG.md: only those h
 VERSION and its own CHANGELOG section become main's VERSION + 1); everything else in the merged files is kept.
 Any other conflict, a fork branch or a merge the token cannot push → comment + `rework`, exit 1 (review skipped).
 Runs from the base branch only: the merge happens in a separate worktree, nothing from the PR is executed.
-shortcut: main moving during the review is not re-synced (decide.py's merge fails, the PR stays open); upgrade to a
-resync on push to main if that happens often."""
+shortcut: main moving during the review is not re-synced (decide.py's merge fails → `rework`, the next push
+re-syncs); upgrade to a resync on push to main if that happens often."""
 import json
 import os
 import re
@@ -30,7 +30,10 @@ def git(*a, cwd=None, check=True):
 
 
 def version(text):
-    return int(re.search(r"^VERSION = (\d+)", text, re.M)[1])
+    m = re.search(r"^VERSION = (\d+)", text, re.M)
+    if not m:
+        raise Unresolved(f"{INIT} (no VERSION line)")
+    return int(m[1])
 
 
 def bumped(text, n):
@@ -69,26 +72,29 @@ def main(pr):
     git("fetch", "-q", "origin", "main", f"+refs/pull/{pr}/head:{head}")
     if git("merge-base", "--is-ancestor", "origin/main", head, check=False).returncode == 0:
         return print(f"#{pr}: up to date with main")
-    if info["isCrossRepository"]:  # the workflow token cannot push to a fork
-        block(pr, "the branch is behind main and lives in a fork; merge main into it and push")
-    if git("diff", "--name-only", f"{head}...origin/main", "--", ".github/workflows").stdout.strip():
-        block(pr, "main changed .github/workflows since this branch, and the CI token may not push workflow files; "
-                  "merge main into the branch and push (not a conflict)")
     sha = git("rev-parse", head).stdout.strip()
     wt = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", f"pr-{pr}")
     git("worktree", "add", "-q", "--detach", wt, head)
     git("-c", "merge.conflictStyle=merge", "merge", "-q", "--no-commit", "--no-ff", "origin/main", cwd=wt, check=False)
     conflicts = set(git("diff", "--name-only", "--diff-filter=U", cwd=wt).stdout.split())
+    if info["isCrossRepository"]:  # the workflow token cannot push to a fork; a clean one is tested on its merge ref
+        if conflicts:
+            block(pr, f"conflicts with main in {', '.join(sorted(conflicts))}; merge main into the fork branch and push")
+        return print(f"#{pr}: fork, merges cleanly with main; reviewed as is")
+    if git("diff", "--name-only", f"{head}...origin/main", "--", ".github/workflows").stdout.strip():
+        block(pr, "main changed .github/workflows since this branch, and the CI token may not push workflow files; "
+                  "merge main into the branch and push (not a conflict)")
     show = lambda ref, f: git("show", f"{ref}:{f}", check=False).stdout
-    own, n = version(show(head, INIT)), version(show("origin/main", INIT)) + 1
-    base_v = version(show(git("merge-base", "origin/main", head).stdout.strip(), INIT))
-    bumps = own > base_v  # a PR that never bumped VERSION is left to pr_checks
     try:
+        own, n = version(show(head, INIT)), version(show("origin/main", INIT)) + 1
+        bumps = own > version(show(git("merge-base", "origin/main", head).stdout.strip(), INIT))  # else: pr_checks
         if conflicts - ({INIT, LOG} if bumps else set()):
             raise Unresolved(", ".join(sorted(conflicts - {INIT, LOG}) or sorted(conflicts)))
         if bumps:
             for f in (INIT, LOG):
                 p = os.path.join(wt, f)
+                if os.path.islink(p):  # the PR's tree is untrusted: never write through its symlinks
+                    raise Unresolved(f"{f} (a symlink)")
                 with open(p, encoding="utf-8") as fh:
                     text = resolve(f, fh.read(), own, n)
                 with open(p, "w", encoding="utf-8") as fh:
