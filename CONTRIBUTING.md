@@ -15,7 +15,7 @@ Texts sent here are **anonymized**: no project names, paths, people or quotes â€
 
 ## What happens to your PR
 
-CI first merges current `main` into the PR (the VERSION/CHANGELOG collision of parallel PRs is resolved for you; any other conflict sends it back), then runs the tests and a budget check (size of agent prompts and code must not grow without a reason), then an AI reviewer posts `VERDICT: accept | rework | reject` with arguments. `accept` is merged and tagged `vN`; every project picks it up on its next `dpcli update`. On `rework`, the next `dpcli update` in your project brings the arguments back so the fix can be reworked or dropped. Maintainers can always step in by hand.
+CI first merges current `main` into the PR (the VERSION/CHANGELOG collision of parallel PRs is resolved for you; any other conflict sends it back), then runs the tests and a budget check (`metrics.py --write-budgets` only lowers `tools/budgets.json`; a justified raise is a hand edit explained in the PR) (size of agent prompts and code must not grow without a reason), then an AI reviewer posts `VERDICT: accept | rework | reject` with arguments. `accept` is merged and tagged `vN`; every project picks it up on its next `dpcli update`. On `rework`, the next `dpcli update` in your project brings the arguments back so the fix can be reworked or dropped. Maintainers can always step in by hand.
 
 ## Manual contributions
 

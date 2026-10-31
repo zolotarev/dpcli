@@ -58,7 +58,7 @@ def resolve(path, text, own, n):
 
 
 def block(pr, why):
-    gh("pr", "comment", pr, "--body", f"Not reviewed: {why}.")
+    gh("pr", "comment", pr, "--body", f"VERDICT: rework\n- Not reviewed: {why}.")  # update shows projects this line
     label(pr, "rework", ["rejected"])
     sys.exit(f"#{pr}: {why}")
 

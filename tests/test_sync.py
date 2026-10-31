@@ -85,6 +85,8 @@ class Sync(unittest.TestCase):
         self.main_moves({"lib/a.py": "x = 3\n"})
         self.assertIn("lib/a.py", self.sync())
         self.assertIn(("label", "7", "rework", ["rejected"]), self.calls)
+        body = next(c[-1] for c in self.calls if c[:2] == ("pr", "comment"))
+        self.assertTrue(body.startswith("VERDICT: rework\n"), body)  # dpcli update reads the reason from it
 
     def test_up_to_date_does_nothing(self):
         self.pr({"lib/a.py": "x = 2\n"})
