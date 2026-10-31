@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Before the AI review: merge current main into the PR, so tests and review see what would land.
-Parallel PRs always collide on VERSION and the top of CHANGELOG.md: resolved here (the PR becomes main's VERSION + 1).
-Any other conflict, or a fork branch behind main → comment + `rework`, exit 1 (the review is skipped).
+Parallel PRs always collide on VERSION and the top of CHANGELOG.md: only those hunks are resolved here (the PR's
+VERSION and its own CHANGELOG section become main's VERSION + 1); everything else in the merged files is kept.
+Any other conflict, a fork branch or a merge the token cannot push → comment + `rework`, exit 1 (review skipped).
 Runs from the base branch only: the merge happens in a separate worktree, nothing from the PR is executed.
 shortcut: main moving during the review is not re-synced (decide.py's merge fails, the PR stays open); upgrade to a
 resync on push to main if that happens often."""
@@ -12,10 +13,13 @@ import subprocess
 import sys
 
 from decide import gh, label
-from pr_checks import DIST
 
 INIT, LOG = "lib/dpcli/__init__.py", "CHANGELOG.md"
-SECTION = re.compile(r"^## (\d+)[^\n]*\n(.*?)(?=^## \d|\Z)", re.M | re.S)
+HUNK = re.compile(r"^<<<<<<< [^\n]*\n(.*?)^=======\n(.*?)^>>>>>>> [^\n]*\n", re.M | re.S)
+
+
+class Unresolved(Exception):
+    pass
 
 
 def git(*a, cwd=None, check=True):
@@ -29,18 +33,28 @@ def version(text):
     return int(re.search(r"^VERSION = (\d+)", text, re.M)[1])
 
 
-def bumped(init, n):
-    return re.sub(r"^VERSION = \d+", f"VERSION = {n}", init, count=1, flags=re.M)
+def bumped(text, n):
+    return re.sub(r"^VERSION = \d+", f"VERSION = {n}", text, count=1, flags=re.M)
 
 
-def changelog(main_log, base_log, pr_log, n):
-    """main's CHANGELOG with the PR's own lines (sections absent at the merge base) on top as section n."""
-    own = [body.strip() for _n, body in SECTION.findall(pr_log) if body.strip() not in base_log]
-    if not own:
-        return main_log
-    i = main_log.find("\n## ")
-    i = len(main_log) if i < 0 else i + 1
-    return main_log[:i] + f"## {n}\n" + "\n".join(own) + "\n\n" + main_log[i:]
+def resolve(path, text, own, n):
+    """The merged file with the VERSION / CHANGELOG-top hunks resolved (ours = the PR, theirs = main).
+    own — the PR's VERSION; raises Unresolved for any other conflict."""
+    def hunk(m):
+        ours, theirs = m[1], m[2]
+        if path == INIT and {l.split("=")[0].strip() for l in (ours + theirs).splitlines() if l.strip()} == {"VERSION"}:
+            return bumped(theirs, n)
+        if path == LOG and re.fullmatch(rf"## {own}\b[^\n]*\n(?:(?!## )[^\n]*\n)*", ours) and theirs.startswith("## "):
+            return re.sub(r"^## \d+", f"## {n}", ours, count=1) + ("" if ours.endswith("\n\n") else "\n") + theirs
+        raise Unresolved(path)
+    text = HUNK.sub(hunk, text)
+    if path == INIT:
+        return bumped(text, n)
+    if not re.search(rf"^## {n}\b", text, re.M):  # merged cleanly: the PR's section still has its old number
+        if len(re.findall(rf"^## {own}\b", text, re.M)) != 1:
+            raise Unresolved(path)
+        text = re.sub(rf"^## {own}\b", f"## {n}", text, count=1, flags=re.M)
+    return text
 
 
 def block(pr, why):
@@ -57,31 +71,39 @@ def main(pr):
         return print(f"#{pr}: up to date with main")
     if info["isCrossRepository"]:  # the workflow token cannot push to a fork
         block(pr, "the branch is behind main and lives in a fork; merge main into it and push")
+    if git("diff", "--name-only", f"{head}...origin/main", "--", ".github/workflows").stdout.strip():
+        block(pr, "main changed .github/workflows since this branch, and the CI token may not push workflow files; "
+                  "merge main into the branch and push (not a conflict)")
+    sha = git("rev-parse", head).stdout.strip()
     wt = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", f"pr-{pr}")
     git("worktree", "add", "-q", "--detach", wt, head)
-    git("merge", "-q", "--no-commit", "--no-ff", "origin/main", cwd=wt, check=False)
+    git("-c", "merge.conflictStyle=merge", "merge", "-q", "--no-commit", "--no-ff", "origin/main", cwd=wt, check=False)
     conflicts = set(git("diff", "--name-only", "--diff-filter=U", cwd=wt).stdout.split())
-    files = git("diff", "--name-only", f"origin/main...{head}").stdout.split()
-    dist = any(f.startswith(DIST) for f in files)
-    if conflicts - ({INIT, LOG} if dist else set()):
-        block(pr, f"conflicts with main in {', '.join(sorted(conflicts))}; merge main and push")
-    if dist:
-        show = lambda ref, f: git("show", f"{ref}:{f}").stdout
-        base = git("merge-base", "origin/main", head).stdout.strip()
-        n = version(show("origin/main", INIT)) + 1
-        if conflicts or version(show(head, INIT)) != n:
-            with open(os.path.join(wt, INIT), "w", encoding="utf-8") as f:
-                f.write(bumped(show("origin/main", INIT), n))
-            with open(os.path.join(wt, LOG), "w", encoding="utf-8") as f:
-                f.write(changelog(show("origin/main", LOG), show(base, LOG), show(head, LOG), n))
+    show = lambda ref, f: git("show", f"{ref}:{f}", check=False).stdout
+    own, n = version(show(head, INIT)), version(show("origin/main", INIT)) + 1
+    base_v = version(show(git("merge-base", "origin/main", head).stdout.strip(), INIT))
+    bumps = own > base_v  # a PR that never bumped VERSION is left to pr_checks
+    try:
+        if conflicts - ({INIT, LOG} if bumps else set()):
+            raise Unresolved(", ".join(sorted(conflicts - {INIT, LOG}) or sorted(conflicts)))
+        if bumps:
+            for f in (INIT, LOG):
+                p = os.path.join(wt, f)
+                with open(p, encoding="utf-8") as fh:
+                    text = resolve(f, fh.read(), own, n)
+                with open(p, "w", encoding="utf-8") as fh:
+                    fh.write(text)
+    except Unresolved as e:
+        block(pr, f"conflicts with main in {e}; merge main and push")
     git("add", "-A", cwd=wt)
     git("commit", "-q", "--no-edit", cwd=wt)
     b = info["headRefName"]
-    if git("push", "-q", "origin", f"HEAD:refs/heads/{b}", cwd=wt, check=False).returncode:
-        block(pr, "could not push the merge with main (workflow files changed?); merge main and push")
+    r = git("push", "-q", f"--force-with-lease=refs/heads/{b}:{sha}", "origin", f"HEAD:refs/heads/{b}", cwd=wt, check=False)
+    if r.returncode:  # the author pushed meanwhile: that push starts a new review, which cancels this one
+        sys.exit(f"#{pr}: push rejected ({r.stderr.strip()[-200:]}); the branch moved, its new review takes over")
     # a push with the workflow token starts no workflows: run the tests on the new head for decide.py
     gh("workflow", "run", "test.yml", "--ref", b, "-f", f"ref={b}")
-    print(f"#{pr}: merged main" + (f", VERSION {n}" if dist else ""))
+    print(f"#{pr}: merged main" + (f", VERSION {n}" if bumps else ""))
 
 
 if __name__ == "__main__":
