@@ -211,6 +211,58 @@ class Copies(RepoCase):
         self.assertIn("dirty copy", why)
         self.assertTrue(path.exists())
 
+    def test_remove_copy_status_noise_without_changes(self):
+        # a pre-commit hook restored the file: status says MM, content equals HEAD
+        self.cfg()
+        path = self.make_copy()
+        (path / "a.txt").write_text("b")
+        sh("add", "a.txt", cwd=path)
+        (path / "a.txt").write_text("a")
+        why, _ = branches.remove_copy(path)
+        self.assertIsNone(why)
+        self.assertFalse(path.exists())
+
+    def test_remove_copy_with_submodule(self):
+        sub = self.main.parent / "sub"
+        sub.mkdir()
+        sh("init", "-q", "-b", "main", cwd=sub)
+        (sub / "s.txt").write_text("s")
+        sh("add", ".", cwd=sub)
+        sh("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "s", cwd=sub)
+        sh("-c", "protocol.file.allow=always", "submodule", "add", "-q", str(sub), "lib", cwd=self.main)
+        sh("commit", "-q", "-m", "sub", cwd=self.main)
+        self.cfg()
+        path = self.make_copy()
+        sh("-c", "protocol.file.allow=always", "submodule", "update", "-q", "--init", cwd=path)
+        (path / "lib" / "work.txt").write_text("работа")
+        why, _ = branches.remove_copy(path)
+        self.assertIn("submodules", why)
+        sh("add", "work.txt", cwd=path / "lib")
+        sh("-c", "user.email=t@t", "-c", "user.name=t", "stash", "-q", cwd=path / "lib")
+        why, _ = branches.remove_copy(path)
+        self.assertIn("submodules", why)
+        sh("stash", "pop", "-q", cwd=path / "lib")
+        # a commit only in the copy's submodule repository would be lost with it
+        sh("add", "work.txt", cwd=path / "lib")
+        sh("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "w", cwd=path / "lib")
+        sh("add", "lib", cwd=path)
+        sh("commit", "-q", "-m", "pointer", cwd=path)
+        why, _ = branches.remove_copy(path)
+        self.assertIn("submodules", why)
+        sh("reset", "-q", "--hard", "HEAD~1", cwd=path)
+        sh("submodule", "update", "-q", cwd=path)
+        # the check itself fails: block, do not assume clean
+        dotgit = path / "lib" / ".git"
+        good = dotgit.read_text()
+        dotgit.write_text("gitdir: /nonexistent\n")
+        why, _ = branches.remove_copy(path)
+        self.assertIn("cannot check submodules", why)
+        dotgit.write_text(good)
+        sh("branch", "-q", "-D", "main", cwd=path / "lib")
+        why, _ = branches.remove_copy(path)
+        self.assertIsNone(why)
+        self.assertFalse(path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

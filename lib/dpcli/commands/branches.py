@@ -184,16 +184,24 @@ def junk_ok(f):
 def remove_copy(path):
     """Remove a copy: refuse (-> reason) on changes in tracked files or untracked work files;
     git-ignored and generated files (gc.ignore_dirs, gc.ignore_globs) do not block it. -> (reason|None, ignored dirs)."""
+    # status noise with content equal to HEAD (a hook restored the files) is not work; any change inside a submodule is,
+    # and so is a submodule commit on no remote: its repository is removed with the copy
     d = gitx.dirty(path)
-    if d:
+    if d and gitx.gitr("diff", "--quiet", "HEAD", cwd=path).returncode:
         return f"dirty copy ({len(d)} files)", []
+    r = gitx.gitr("submodule", "foreach", "--quiet", "--recursive",
+                  "git status --porcelain && git stash list && git rev-list --branches HEAD --not --remotes", cwd=path)
+    if r.returncode:
+        return f"cannot check submodules: {gitx.gerr(r)}", []
+    if r.stdout.split():
+        return "changes or unpushed commits in submodules", []
     junk = [f for xy, f in gitx.status_entries(path) if xy == "??"]
     other = [f for f in junk if not junk_ok(f)]
     if other:
         return f"untracked files ({len(other)}: {', '.join(other[:3])})", []
     ign = ignored_dirs(path)
-    # only generated files, not work: git refuses on untracked, hence --force
-    r = gitx.gitr("worktree", "remove", *(["--force"] if junk else []), str(path))
+    # checked above; --force: git refuses on untracked generated files and on any copy with a submodule
+    r = gitx.gitr("worktree", "remove", "--force", str(path))
     if r.returncode:
         return gitx.gerr(r), []
     return None, ign

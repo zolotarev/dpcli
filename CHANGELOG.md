@@ -1,5 +1,8 @@
 # Changelog
 
+## 36
+- `gc --remove` removes copies with a submodule (git refused without `--force`) and copies whose status shows changes but content equals HEAD (a hook restored the files); a change, a stash or a commit on no remote inside a submodule still blocks removal, and so does a failed submodule check.
+
 ## 35
 - `gc` also removes branches squash-merged into the main branch, and branches merged into them.
 
