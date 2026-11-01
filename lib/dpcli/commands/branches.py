@@ -200,12 +200,14 @@ def remove_copy(path):
 
 
 def squash_merged(main, merged):
-    """Local branches squash-merged into main (their whole diff is one commit there), plus branches merged into those."""
+    """Local branches squash-merged into main (their whole diff is one commit there, by patch-id), plus branches
+    merged into those. A branch with an empty net diff is never matched. Costs a few git calls per unmerged
+    branch and leaves one dangling commit object each (collected by git gc)."""
     rest = [b for b in gitx.local_branches() if b != main and b not in merged]
     out = set()
     for b in rest:
         base = gitx.gitr("merge-base", main, b).stdout.strip()
-        if not base:
+        if not base or gitx.gitr("rev-parse", f"{b}^{{tree}}").stdout == gitx.gitr("rev-parse", f"{base}^{{tree}}").stdout:
             continue
         tmp = gitx.gitr("commit-tree", f"{b}^{{tree}}", "-p", base, "-m", "gc").stdout.strip()
         if tmp and gitx.gitr("cherry", main, tmp).stdout.startswith("-"):

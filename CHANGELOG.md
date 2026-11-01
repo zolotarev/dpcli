@@ -1,7 +1,7 @@
 # Changelog
 
 ## 35
-- `gc` sees branches squash-merged into the main branch (their diff is one commit there) and branches merged into those: after a squash MR it reported "no merged branches" and copies were removed by hand.
+- `gc` also removes branches squash-merged into the main branch, and branches merged into them.
 
 ## 34
 - `contribute` makes the `improve/F-n-*` branch and the commit from uncommitted edits in `.dpcli`: agents may run dpcli but not git there, so a friction stopped on a permission.
