@@ -184,13 +184,15 @@ def junk_ok(f):
 def remove_copy(path):
     """Remove a copy: refuse (-> reason) on changes in tracked files or untracked work files;
     git-ignored and generated files (gc.ignore_dirs, gc.ignore_globs) do not block it. -> (reason|None, ignored dirs)."""
-    # status noise with content equal to HEAD (a hook restored the files) is not work; any change inside a submodule is
+    # status noise with content equal to HEAD (a hook restored the files) is not work; any change inside a submodule is,
+    # and so is a submodule commit on no remote: its repository is removed with the copy
     d = gitx.dirty(path)
     if d and gitx.gitr("diff", "--quiet", "HEAD", cwd=path).returncode:
         return f"dirty copy ({len(d)} files)", []
-    sub = gitx.gitr("submodule", "foreach", "--quiet", "--recursive", "git status --porcelain", cwd=path).stdout.split("\n")
-    if any(sub):
-        return f"dirty copy ({sum(map(bool, sub))} files in submodules)", []
+    sub = gitx.gitr("submodule", "foreach", "--quiet", "--recursive",
+                    "git status --porcelain; git rev-list --branches HEAD --not --remotes", cwd=path).stdout.split()
+    if sub:
+        return "changes or unpushed commits in submodules", []
     junk = [f for xy, f in gitx.status_entries(path) if xy == "??"]
     other = [f for f in junk if not junk_ok(f)]
     if other:
