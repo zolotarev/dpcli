@@ -189,9 +189,11 @@ def remove_copy(path):
     d = gitx.dirty(path)
     if d and gitx.gitr("diff", "--quiet", "HEAD", cwd=path).returncode:
         return f"dirty copy ({len(d)} files)", []
-    sub = gitx.gitr("submodule", "foreach", "--quiet", "--recursive",
-                    "git status --porcelain; git rev-list --branches HEAD --not --remotes", cwd=path).stdout.split()
-    if sub:
+    r = gitx.gitr("submodule", "foreach", "--quiet", "--recursive",
+                  "git status --porcelain && git stash list && git rev-list --branches HEAD --not --remotes", cwd=path)
+    if r.returncode:
+        return f"cannot check submodules: {gitx.gerr(r)}", []
+    if r.stdout.split():
         return "changes or unpushed commits in submodules", []
     junk = [f for xy, f in gitx.status_entries(path) if xy == "??"]
     other = [f for f in junk if not junk_ok(f)]
