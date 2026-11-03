@@ -1,5 +1,8 @@
 # Changelog
 
+## 37
+- Bash write guard: the refusal says up front to Read the file before Edit (an unread Edit cost one more round), and shell writes to git-ignored files (build output, artifacts) pass like `/tmp`.
+
 ## 36
 - `gc --remove` removes copies with a submodule (git refused without `--force`) and copies whose status shows changes but content equals HEAD (a hook restored the files); a change, a stash or a commit on no remote inside a submodule still blocks removal, and so does a failed submodule check.
 
