@@ -9,9 +9,9 @@ from helpers import DIST, Project
 GUARD = DIST / "hooks" / "bash_guard.py"
 
 
-def run(cmd):
+def run(cmd, cwd=None):
     r = subprocess.run([sys.executable, str(GUARD)], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, cwd=cwd)
     return r.returncode, r.stderr
 
 
@@ -30,6 +30,16 @@ class BashGuard(unittest.TestCase):
             code, err = run(cmd)
             self.assertEqual(code, 2, cmd)
             self.assertIn("Edit", err)
+        self.assertIn("Read the file first", err)  # Edit refuses an unread file: say so now, not one round later
+
+    def test_allows_git_ignored_targets(self):
+        p = Project()
+        self.addCleanup(p.cleanup)
+        (p.root / ".gitignore").write_text("build/\n")
+        for cmd in ("cat > build/r.json <<'EOF'\n{}\nEOF", "sed -i s/a/b/ build/x.md",
+                    "python3 - <<'EOF'\nopen('build/a.txt', 'w').write('x')\nEOF"):
+            self.assertEqual(run(cmd, p.root)[0], 0, cmd)
+        self.assertEqual(run("sed -i s/a/b/ src/x.ts", p.root)[0], 2)
 
     def test_allows_programs_reads_and_quoted_text(self):
         for cmd in ("rg -n foo src", "sed -n '1,20p' f", "python3 - <<'EOF'\nprint(1)\nEOF", "cat f | jq .",

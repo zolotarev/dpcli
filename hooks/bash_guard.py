@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """PreToolUse hook (Bash): refuse editing project files through the shell (sed -i, perl -i, cat > file <<, python3 -
-heredocs that write); Edit/Write pay only the change. Exit 2 = blocked. Temporary files pass; echo/tee > file are
-not covered on purpose."""
+heredocs that write); Edit/Write pay only the change. Exit 2 = blocked. Temporary and git-ignored files (build
+output) pass; echo/tee > file are not covered on purpose."""
 import json
 import re
+import subprocess
 import sys
 
 TEMP = ("/tmp/", "$TMPDIR", "${TMPDIR", "/dev/")
@@ -14,6 +15,12 @@ SHELL = [  # on every command line outside heredoc bodies, quoted strings remove
 ]
 PY_HEREDOC = re.compile(r"\bpython3?\s+-\s*<<")
 PY_WRITES = re.compile(r"\.write_(?:text|bytes)\(|\bopen\([^)]*['\"][wax]b?\+?['\"]")
+
+
+def scratch(path):
+    """Not a project file: temporary or ignored by git (build output, artifacts)."""
+    return path.startswith(TEMP) or subprocess.run(["git", "check-ignore", "-q", "--", path],
+                                                   capture_output=True).returncode == 0
 
 
 def split(cmd):
@@ -41,7 +48,7 @@ def edits(ln):
             continue
         seg = re.split(r"[|;&]", ln[m.end():], maxsplit=1)[0]  # this command only, not `; rm /tmp/x` after it
         target = m.group(1) if m.groups() else (seg.split() or [""])[-1]
-        if not target.startswith(TEMP):  # temporary files are not project files
+        if not scratch(target):
             return what
     return None
 
@@ -53,14 +60,15 @@ def main():
         return 0
     lines, body = split(cmd)
     hits = [w for w in map(edits, lines) if w]
-    writes = [ln for ln in body.split("\n") if PY_WRITES.search(ln) and not any(t.strip("/") in ln for t in TEMP)]
+    writes = [ln for ln in body.split("\n") if PY_WRITES.search(ln) and not any(t.strip("/") in ln for t in TEMP)
+              and not any(scratch(p) for p in re.findall(r"['\"]([^'\"\s]*/[^'\"\s]*)['\"]", ln))]
     if any(PY_HEREDOC.search(ln) for ln in lines) and writes:
         hits.append("python3 - writing files")
     if not hits:
         return 0
-    print(f"dpcli: {hits[0]} edits project files through the shell — use the Edit tool (exact replacement) or Write "
-          f"(new file); read with Read; bulk renames: ast-grep run -p OLD -r NEW -U. Temporary files (/tmp) are fine.",
-          file=sys.stderr)
+    print(f"dpcli: {hits[0]} edits project files through the shell. Read the file first (cat in Bash does not count), "
+          f"then Edit (exact replacement); a new file — Write; bulk renames: ast-grep run -p OLD -r NEW -U. "
+          f"Temporary (/tmp) and git-ignored files (build/) are fine.", file=sys.stderr)
     return 2
 
 
