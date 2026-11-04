@@ -10,6 +10,7 @@ import sys
 import time
 
 REVIEWERS = {"github-actions", "github-actions[bot]", "app/github-actions"}
+MAX_ROUNDS = 5  # automatic rework rounds per PR; then it waits for its author (nightly: closed by the next nightly)
 
 
 def gh(*a, check=True):
@@ -90,5 +91,22 @@ def main(pr):
     print(f"#{pr}: rework")
 
 
+def gate(pr):
+    """After the review: may CI rework the PR itself? Open, labelled `rework`, a branch of this repository
+    (the token can push; its authors have write access) and under MAX_ROUNDS. -> the branch to rework or ""."""
+    info = json.loads(gh("pr", "view", pr, "--json", "state,labels,isCrossRepository,headRefName,comments"))
+    if info["state"] != "OPEN" or "rework" not in {x["name"] for x in info["labels"]} or info["isCrossRepository"]:
+        return ""
+    rounds = sum(1 for c in info["comments"] if (c.get("author") or {}).get("login") in REVIEWERS
+                 and c["body"].startswith("VERDICT: rework"))
+    if rounds > MAX_ROUNDS:
+        gh("pr", "comment", pr, "--body", f"Auto-rework stopped after {MAX_ROUNDS} rounds: the author's turn.")
+        return ""
+    return info["headRefName"]
+
+
 if __name__ == "__main__":
-    main(sys.argv[1])
+    if sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT
+        print(f"branch={gate(sys.argv[2])}")
+    else:
+        main(sys.argv[1])

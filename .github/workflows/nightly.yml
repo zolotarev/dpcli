@@ -33,7 +33,7 @@ jobs:
         run: |
           pr=$(gh pr list --label nightly-simplify --state open --json number,headRefName,labels --jq '.[0] // empty')
           new=$(git log --since="25 hours ago" --oneline origin/main | wc -l)
-          # a nightly PR sent back for rework is closed, not reworked: a fresh one from current main is cheaper
+          # a nightly PR still in rework (CI gave up, tools/decide.py MAX_ROUNDS) is closed: a fresh one from main is cheaper
           if [ -n "$pr" ] && jq -e '[.labels[].name] | index("rework")' <<<"$pr" >/dev/null; then
             gh pr close "$(jq -r .number <<<"$pr")" --delete-branch --comment "Closed: sent back for rework; tonight's nightly starts fresh from main."
             pr=""

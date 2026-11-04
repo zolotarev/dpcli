@@ -11,6 +11,7 @@ from helpers import REPO, git
 
 sys.path.insert(0, str(REPO / "tools"))
 import metrics  # noqa: E402
+import decide  # noqa: E402
 import sync  # noqa: E402
 
 INIT = '"""doc."""\n\nVERSION = {}  # bump\n'
@@ -142,6 +143,30 @@ class Budgets(unittest.TestCase):
         b = {"code_lines": 8, "prompt_tokens": 9, "prompt_max": 3, "duplicate_windows": 0, "risky": {"push": 4}}
         self.assertEqual(metrics.lowered(m, b), {"code_lines": 8, "prompt_tokens": 5, "prompt_max": 3,
                                                  "duplicate_windows": 0, "risky": {"push": 4, "new": 1}})
+
+
+class Gate(unittest.TestCase):
+    """decide.gate: CI reworks its own-repo PRs sent back, at most MAX_ROUNDS times."""
+
+    def run_gate(self, rounds, cross=False, labels=("rework",)):
+        bot = {"login": "github-actions"}
+        info = {"state": "OPEN", "labels": [{"name": n} for n in labels], "isCrossRepository": cross, "headRefName": "b",
+                "comments": [{"author": bot, "body": "VERDICT: rework\n- x"}] * rounds
+                + [{"author": {"login": "eve"}, "body": "VERDICT: rework"}] * 9}
+        calls = []
+        decide.gh = lambda *a, **k: calls.append(a) or json.dumps(info)
+        return decide.gate("7"), calls
+
+    def test_reworks_until_the_cap(self):
+        self.assertEqual(self.run_gate(1)[0], "b")
+        self.assertEqual(self.run_gate(decide.MAX_ROUNDS)[0], "b")
+        branch, calls = self.run_gate(decide.MAX_ROUNDS + 1)
+        self.assertEqual(branch, "")
+        self.assertIn("comment", calls[-1])
+
+    def test_forks_and_accepted_are_left_alone(self):
+        self.assertEqual(self.run_gate(1, cross=True)[0], "")
+        self.assertEqual(self.run_gate(1, labels=())[0], "")
 
 
 if __name__ == "__main__":

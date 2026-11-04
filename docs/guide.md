@@ -96,15 +96,15 @@ After `init`, commit the result (only the main session commits).
 | `feedback new "title" --match REGEX --scope project\|dpcli [--why]` | create a cluster F-n (ledger `.dpcli-local/feedback.jsonl`) |
 | `feedback fix F-n --where … [--pr URL]` · `wontfix F-n --why …` · `reopen F-n` | close / reject / reopen |
 | `stats [module] [--since D] [--tokens]` | tasks, created→accepted, rework rounds, frictions; check durations (median/max s); `--tokens`: context tokens of executors, reviewers and coordinators and per task, from Claude Code's subagent logs |
-| `contribute F-n [--title T] [--new]` | dpcli-scope fix from `.dpcli` branch `improve/*` → PR to the hub (origin or fork), or +1 on a similar open one; no commits → issue; no `gh` → `build/dpcli/contribute-F-n/` with issue text and patches |
+| `contribute F-n [--title T] [--new]` | dpcli-scope fix from `.dpcli` branch `improve/*` → PR to the hub (origin or fork), or +1 on a similar open one; no commits → issue; no `gh` → `build/dpcli/contribute-F-n/` with issue text and patches. After the PR `.dpcli` goes back to `main` (updates keep coming); again with commits on the PR's branch → pushed to the same PR |
 
 ## Updating automatically
 
-`init` adds a Claude Code `SessionStart` hook: `.dpcli/dpcli update --auto` — at most once a day, silent when nothing happened.
+`init` adds a Claude Code `SessionStart` hook: `.dpcli/dpcli update --auto` — at most once an hour, silent when nothing happened.
 
 `update` works in the main copy only. It fetches the hub, moves the `.dpcli` submodule to the latest release tag `vN` (never to a branch), runs `init` (the project layer `.dpcli-local/` is applied again) and commits `.dpcli`, `.claude/` and `CLAUDE.md` with the message `dpcli vN`, printing the CHANGELOG lines of the new releases. It skips, with one line of explanation, when `.dpcli` has uncommitted changes, is on an `improve/*` branch, has local commits on `main`, or the network is down.
 
-It also checks the PRs and issues this project sent with `contribute`: merged → the cluster is marked fixed; `rework` or rejected → the reviewer's arguments go into the ledger and `harness-retro` decides whether to rework or drop.
+It also checks the PRs and issues this project sent with `contribute`: merged → the cluster is marked fixed; `rework` → the hub's CI reworks PRs from its own branches by itself (up to 5 rounds); a fork's PR, or one CI gave up on, is reworked by `harness-retro`; rejected → the reviewer's arguments go into the ledger.
 
 | Flag | |
 |---|---|

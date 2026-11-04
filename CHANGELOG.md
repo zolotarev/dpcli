@@ -1,5 +1,8 @@
 # Changelog
 
+## 38
+- Autonomous loop. Hub CI reworks a PR from its own branches after a `rework` verdict, then tests and reviews it again, up to 5 rounds (`tools/decide.py --gate`). `contribute` puts `.dpcli` back on `main` after the PR, so updates keep coming. Called again with commits, it pushes to the same PR instead of +1-ing it. `update --auto` runs hourly, not daily. `harness-retro` applies its ≤ 3 changes without asking and then tells the user.
+
 ## 37
 - Bash write guard: the refusal says up front to Read the file before Edit (an unread Edit cost one more round), and shell writes to git-ignored files (build output, artifacts) pass like `/tmp`.
 

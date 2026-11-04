@@ -70,6 +70,13 @@ def cmd_contribute(a):
     if not gh_ok():
         return offline(a.id, title, body, commits, dist)
     repo = hub(dist)
+    if commits and c.get("pr") and "/pull/" in c["pr"] and c["status"] in ("open", "rework"):  # rework of the own PR
+        r = run("git", "push", "-q", cwd=dist)
+        if r.returncode:
+            raise DpError(f"git push: {r.stderr.strip()}")
+        append_jsonl(ledger_path(), {"t": now(), "id": a.id, "kind": "reopen"})
+        print(f"{a.id}: pushed to {c['pr']} (reviewed again)")
+        return home(dist, branch)
     if not a.new:
         dup = similar(repo, title)
         if dup:
@@ -84,6 +91,7 @@ def cmd_contribute(a):
         url = open_pr(repo, dist, branch, title, body)
         record(a.id, "pr", url)
         print(f"{a.id}: PR {url}")
+        home(dist, branch)
     else:
         r = run("gh", "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label", "feedback")
         if r.returncode:
@@ -125,6 +133,13 @@ def open_pr(repo, dist, branch, title, body):
     if r.returncode:
         raise DpError(f"gh pr create: {r.stderr.strip()}")
     return r.stdout.strip().splitlines()[-1]
+
+
+def home(dist, branch):
+    """The branch is pushed: .dpcli back to main, so `update` keeps running while the PR is reviewed."""
+    if run("git", "switch", "-q", "main", cwd=dist).returncode == 0:
+        print(f".dpcli back on main: updates go on, the fix comes with its release; "
+              f"rework: git -C .dpcli switch {branch}, edit, {CLI} contribute again")
 
 
 def outbox(fid):

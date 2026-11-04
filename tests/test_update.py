@@ -1,5 +1,5 @@
 """update: fast-forward the .dpcli submodule to the latest tag, re-render with the project layer, commit the pointer;
-skip when dirty / on improve/*; pin; once a day with --auto; report the fate of own PRs."""
+skip when dirty / on improve/*; pin; once an hour with --auto; report the fate of own PRs."""
 import json
 import os
 import re
@@ -149,7 +149,7 @@ class Update(unittest.TestCase):
         self.p.ok("update", env=self.env)
         self.assertEqual(self.head_version(), self.v0 + 2)
 
-    def test_auto_once_a_day(self):
+    def test_auto_once_an_hour(self):
         self.p.ok("update", "--auto", env=self.env)
         self.release(self.v0 + 1)
         self.assertEqual(self.p.ok("update", "--auto", env=self.env).strip(), "")
