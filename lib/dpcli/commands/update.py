@@ -135,14 +135,15 @@ def check_prs():
     for fid, c in todo.items():
         url = c["pr"]
         kind = "pr" if "/pull/" in url else "issue"
-        r = run("gh", kind, "view", url, "--json", "state,labels,comments", timeout=20)
+        r = run("gh", kind, "view", url, "--json", "state,labels,comments" + (",stateReason" if kind == "issue" else ""), timeout=20)
         try:
             info = json.loads(r.stdout)
         except (json.JSONDecodeError, TypeError):
             continue
         state = str(info.get("state", "")).upper()
-        labels = {x.get("name") for x in info.get("labels") or []}
-        verdict = next((x.get("body", "") for x in reversed(info.get("comments") or []) if "VERDICT:" in x.get("body", "")), "")
+        labels = {x.get("name") for x in info.get("labels") or []} | ({"rejected"} if info.get("stateReason") == "NOT_PLANNED" else set())
+        verdict = next((x.get("body", "") for x in reversed(info.get("comments") or [])
+                        if re.search("VERDICT:|^Not a dpcli change", x.get("body", ""))), "")
         why = short(" ".join(l.strip("- ") for l in verdict.splitlines()[1:] if l.strip()), 200)
         tag = url.rstrip("/").rsplit("/", 2)[-2] + "/" + url.rstrip("/").rsplit("/", 1)[-1]
         if state == "MERGED":  # rejected/closed: the branch may be the only copy, harness-retro may rework it

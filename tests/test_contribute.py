@@ -81,14 +81,21 @@ class Contribute(unittest.TestCase):
         self.assertEqual(pr[pr.index("--head") + 1], "alice:improve/F-1-bg-accept")
         self.assertIn("improve/F-1-bg-accept", git("ls-remote", str(self.fork), cwd=self.dist))
 
-    def test_plus_one_instead_of_duplicate(self):
-        self.improve()
+    def test_plus_one_instead_of_duplicate(self):  # nothing to add but the count
         similar = json.dumps([{"number": 5, "title": "Long accept blocks agents", "url": "https://github.com/o/r/issues/5"}])
         out = self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar})
         self.assertIn("+1", out)
         cs = self.calls()
         self.assertTrue(any(c[:2] == ["issue", "comment"] and "5" in c for c in cs))
         self.assertFalse(any(c[:2] == ["pr", "create"] for c in cs))
+
+    def test_fix_for_a_known_issue_is_a_pr_that_closes_it(self):
+        self.improve()
+        similar = json.dumps([{"number": 5, "title": "Long accept blocks agents", "url": "https://github.com/o/r/issues/5"}])
+        self.assertIn("pull/12", self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar}))
+        pr = next(c for c in self.calls() if c[:2] == ["pr", "create"])
+        self.assertIn("Fixes #5", pr[pr.index("--body") + 1])
+        self.assertFalse(any(c[:2] == ["issue", "comment"] for c in self.calls()))
 
     def test_issue_without_commits(self):
         out = self.p.ok("contribute", "F-1", env=self.env)
