@@ -97,11 +97,14 @@ class Contribute(unittest.TestCase):
         self.assertIn("Fixes #5", pr[pr.index("--body") + 1])
         self.assertFalse(any(c[:2] == ["issue", "comment"] for c in self.calls()))
 
-    def test_fix_for_a_merely_similar_issue_stays_a_plus_one(self):
+    def test_fix_for_a_merely_similar_issue_is_a_pr_that_does_not_close_it(self):
         self.improve()
         similar = json.dumps([{"number": 5, "title": "Long accept blocks agents", "url": "https://github.com/o/r/issues/5"}])
-        self.assertIn("+1", self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar}))
-        self.assertFalse(any(c[:2] == ["pr", "create"] for c in self.calls()))
+        self.assertIn("pull/12", self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar}))
+        body = next(c for c in self.calls() if c[:2] == ["pr", "create"])
+        body = body[body.index("--body") + 1]
+        self.assertIn("Related: #5", body)  # the fix is sent; the merge does not close a merely similar issue
+        self.assertNotIn("Fixes", body)
 
     def test_issue_without_commits(self):
         out = self.p.ok("contribute", "F-1", env=self.env)
