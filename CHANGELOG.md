@@ -1,5 +1,8 @@
 # Changelog
 
+## 38
+- `templates/workflow.md`: dropped five redundant lines (about 100 prompt tokens per agent run); no behaviour change.
+
 ## 37
 - Bash write guard: the refusal says up front to Read the file before Edit (an unread Edit cost one more round), and shell writes to git-ignored files (build output, artifacts) pass like `/tmp`.
 

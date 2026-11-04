@@ -13,8 +13,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 
 ## Lifecycle
 1. Plan `{{plan_dir}}/<m>.md`: goal, user decisions, tasks with scope and acceptance, waves, stop conditions.
-2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor. Several modules of one feature — each its own branch from the same feature branch.
-3. Waves: ≤ 4 executors at once; task → card → copy and branch `<m>/<ID>` from `{{module_branch}}` → acceptance (see "Acceptance").
+2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor.3. Waves: ≤ 4 executors at once; task → card → copy and branch `<m>/<ID>` from `{{module_branch}}` → acceptance (see "Acceptance").
 4. Gate (stop condition or a fork outside the plan): `{{cli}} decide <m> "question" --ask` → main session asks the user → `answer`.
 5. User check → on approval `{{cli}} deliver <m>`: one squash commit into the module base (`--into` — another branch); of the journal only `decisions.md` and `summary.md` go there; the full journal stays in `{{module_branch}}` (and under an archive tag if `deliver.archive_tag` is set); plan and contracts get `status: closed`, `INDEX.md` is rebuilt. Don't develop the module branch after delivery. Feature branch into `{{main_branch}}` — only by the user's decision (usually an MR merged by a human); `deliver`/`merge` into `{{main_branch}}` — only with explicit `--into`.
 
@@ -31,7 +30,6 @@ Agents send only these formats.
 | coordinator → main | `<m>: <n> accepted, <n> in progress; gate Q<n>`, `<m>: wave <n> done` (main starts a fresh coordinator for the next wave) or `<m> done` |
 | main → user | free form, from `{{cli}} status` / `{{cli}} digest` |
 
-- User decisions are already in the inbox (via `decide`); don't retell them in messages.
 - Add nothing to `brief`: task specifics go into the card (`{{cli}} task note <ID> "…"`).
 - Missing information — ask in one line. New rules for a running agent — by message, no restart.
 
@@ -49,7 +47,6 @@ The coordinator writes it so the executor has nothing to search for:
 `{{contracts_dir}}/<m>.md` — per interface: owner and consumers, the exact interface (signatures, fields, units, axes, types, behaviour on missing data, invariants), version.
 - Record what exists in code; report discrepancies.
 - Only the coordinator changes an interface: version +1, notify consumers, their fix in the same step.
-- A contract test breaks if the format changed without updating the contract.
 - Bulk data between tasks — format in the contract with a version; compact, with a schema, written once (temp file + rename).
 
 ## Acceptance
@@ -59,8 +56,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 3. PASS, `dpcli_review: true` → `checked`, then by risk:
    - by default — by the report (`report --show`: checks, `uncertain`) → `{{cli}} event <ID> accepted --note "by report"`;
    - a fresh `dp-reviewer` — complex domain logic, numerical schemes, parallel/GPU computing, a contract interface, second rework, serious `uncertain`.
-4. Reviewer verdict: accept → `event accepted --note "by review"`; rework → to the executor: `{{cli}} review <ID> --show`, then `accept` again and a fresh reviewer. Disputed points — a question to the reviewer/executor.
-5. Merge the task branch into `{{module_branch}}`, `{{cli}} accept <ID> --here --commit <h>`, `{{cli}} event <ID> merged`, remove the copy.
+4. Reviewer verdict: accept → `event accepted --note "by review"`; rework → to the executor: `{{cli}} review <ID> --show`, then `accept` again and a fresh reviewer.5. Merge the task branch into `{{module_branch}}`, `{{cli}} accept <ID> --here --commit <h>`, `{{cli}} event <ID> merged`, remove the copy.
 
 ## General rules
 - Refer to decisions in plans, contracts and cards by `Q<n>` or date `YYYY-MM-DD`, not by time ("decision 12:35"): after delivery the journal with timestamps is not in the branch.
@@ -114,10 +110,8 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 - Stall: "⚠quiet" > 30–40 min — find out what it is doing, report.
 
 ## Sessions and context
-Every turn pays for the whole session context again.
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
 - With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
-- Subagents — only when needed (protocol, waves).
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, but changes only with the user's approval.
