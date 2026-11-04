@@ -138,6 +138,20 @@ class Contribute(unittest.TestCase):
         b = "improve/F-1-long-accept-blocks-the-agent"
         self.assertEqual(git("rev-parse", b, cwd=self.dist), git("ls-remote", str(self.origin), b, cwd=self.dist).split()[0])
         self.assertEqual(git("branch", "--show-current", cwd=self.dist), "main")
+        git("switch", "-q", b, cwd=self.dist)
+        code, _, err = self.p.run("contribute", "F-1", env=self.env)  # nothing new: no empty push, no reopen
+        self.assertEqual(code, 1)
+        self.assertIn("nothing new", err)
+        other = self.p.tmp / "other"  # CI pushed its rework to the branch meanwhile
+        git("clone", "-q", "-b", b, str(self.origin), str(other), cwd=self.p.tmp)
+        (other / "y.txt").write_text("ci")
+        git("add", "y.txt", cwd=other)
+        git("-c", "user.name=ci", "-c", "user.email=ci@x", "commit", "-q", "-m", "ci rework", cwd=other)
+        git("push", "-q", "origin", b, cwd=other)
+        (self.dist / "x.txt").write_text("x again")
+        code, _, err = self.p.run("contribute", "F-1", env=self.env)
+        self.assertEqual(code, 1)
+        self.assertIn("pull --rebase", err)
 
     def test_no_gh_writes_patch(self):
         self.improve()

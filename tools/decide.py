@@ -93,20 +93,24 @@ def main(pr):
 
 def gate(pr):
     """After the review: may CI rework the PR itself? Open, labelled `rework`, a branch of this repository
-    (the token can push; its authors have write access) and under MAX_ROUNDS. -> the branch to rework or ""."""
+    (the token can push; its authors have write access) and under MAX_ROUNDS.
+    -> (branch to rework or "", the reviewer's comments from its last verdict on: the only input of the rework agent)"""
     info = json.loads(gh("pr", "view", pr, "--json", "state,labels,isCrossRepository,headRefName,comments"))
     if info["state"] != "OPEN" or "rework" not in {x["name"] for x in info["labels"]} or info["isCrossRepository"]:
-        return ""
-    rounds = sum(1 for c in info["comments"] if (c.get("author") or {}).get("login") in REVIEWERS
-                 and c["body"].startswith("VERDICT: rework"))
+        return "", ""
+    bot = [c["body"] for c in info["comments"] if (c.get("author") or {}).get("login") in REVIEWERS]
+    rounds = sum(b.startswith("VERDICT: rework") for b in bot)
     if rounds > MAX_ROUNDS:
         gh("pr", "comment", pr, "--body", f"Auto-rework stopped after {MAX_ROUNDS} rounds: the author's turn.")
-        return ""
-    return info["headRefName"]
+        return "", ""
+    last = max((i for i, b in enumerate(bot) if b.startswith("VERDICT:")), default=0)
+    return info["headRefName"], "\n\n".join(bot[last:])
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT
-        print(f"branch={gate(sys.argv[2])}")
+    if sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT, the review to argv[3]
+        branch, review = gate(sys.argv[2])
+        open(sys.argv[3], "w", encoding="utf-8").write(review)
+        print(f"branch={branch}")
     else:
         main(sys.argv[1])

@@ -8,6 +8,6 @@
     "force": 22,
     "reset --hard": 0,
     "shell=True": 0,
-    "push": 5
+    "push": 4
   }
 }
