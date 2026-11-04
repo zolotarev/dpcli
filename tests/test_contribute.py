@@ -153,6 +153,18 @@ class Contribute(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("pull --rebase", err)
 
+    def test_plus_one_goes_home_and_a_failed_switch_is_said(self):
+        self.improve()
+        similar = json.dumps([{"number": 5, "title": "Long accept blocks agents", "url": "https://github.com/o/r/issues/5"}])
+        self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar})
+        self.assertEqual(git("branch", "--show-current", cwd=self.dist), "main")  # +1 sent: back on main
+        self.p.ok("feedback", "new", "Other", "--match", "zzz", "--scope", "dpcli")
+        git("switch", "-q", "-c", "improve/F-2-x", cwd=self.dist)
+        git("worktree", "add", "-q", str(self.p.tmp / "wt"), "main", cwd=self.dist)  # the way back fails: said, not silent
+        (self.dist / "y.txt").write_text("y")
+        out = self.p.ok("contribute", "F-2", env=self.env)
+        self.assertIn(".dpcli stays on improve/F-2-x, updates skip", out)
+
     def test_no_gh_writes_patch(self):
         self.improve()
         nogh = self.p.tmp / "nogh"

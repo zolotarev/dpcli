@@ -71,7 +71,10 @@ def cmd_contribute(a):
         return offline(a.id, title, body, commits, dist)
     repo = hub(dist)
     if "/pull/" in c.get("pr", "") and c["status"] in ("open", "rework"):  # the own PR: rework, never a +1 on itself
-        if not run("git", "log", "--oneline", "@{u}..HEAD", cwd=dist).stdout.strip():
+        r = run("git", "log", "--oneline", "@{u}..HEAD", cwd=dist)
+        if r.returncode:
+            raise DpError(f"{a.id}: {branch or 'HEAD'} has no upstream: switch .dpcli to the improve/{a.id}-* branch of {c['pr']}")
+        if not r.stdout.strip():
             raise DpError(f"{a.id}: nothing new for {c['pr']}: switch .dpcli to its improve/{a.id}-* branch, fix, contribute")
         push(dist)
         append_jsonl(ledger_path(), {"t": now(), "id": a.id, "kind": "reopen"})
@@ -86,7 +89,7 @@ def cmd_contribute(a):
                 raise DpError(f"gh issue comment: {r.stderr.strip()}")
             record(a.id, "pr" if "/pull/" in dup["url"] else "issue", dup["url"])
             print(f"{a.id}: +1 on {dup['url']} (similar: «{dup['title']}»; new one anyway — --new)")
-            return
+            return home(dist, branch)
     if commits:
         url = open_pr(repo, dist, branch, title, body)
         record(a.id, "pr", url)
@@ -141,8 +144,13 @@ def push(dist, *args):
 
 
 def home(dist, branch):
-    """The branch is pushed: .dpcli back to main, so `update` keeps running while the PR is reviewed."""
-    if run("git", "switch", "-q", "main", cwd=dist).returncode == 0:
+    """Sent: .dpcli back to main, so `update` keeps running while the PR is reviewed (the branch stays)."""
+    if not branch.startswith("improve/"):
+        return
+    r = run("git", "switch", "-q", "main", cwd=dist)
+    if r.returncode:
+        print(f".dpcli stays on {branch}, updates skip: {r.stderr.strip()[-200:]} — fix, then git -C .dpcli switch main")
+    else:
         print(f".dpcli back on main: updates go on, the fix comes with its release; "
               f"rework: git -C .dpcli switch {branch}, edit, {CLI} contribute again")
 

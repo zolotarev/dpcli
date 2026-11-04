@@ -154,6 +154,10 @@ class Update(unittest.TestCase):
         self.release(self.v0 + 1)
         self.assertEqual(self.p.ok("update", "--auto", env=self.env).strip(), "")
         self.assertEqual(self.head_version(), self.v0)
+        for st in (self.p.tmp / "home" / ".cache" / "dpcli").glob("*/update.stamp"):  # an hour later: runs again
+            os.utime(st, (st.stat().st_mtime - 3601,) * 2)
+        self.p.ok("update", "--auto", env=self.env)
+        self.assertEqual(self.head_version(), self.v0 + 1)
 
     def test_own_pr_merged_marks_fixed_and_rework_reported(self):
         self.p.ok("module", "init", "web", "--code", "WB")

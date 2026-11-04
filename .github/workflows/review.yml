@@ -53,8 +53,9 @@ jobs:
         run: python3 tools/decide.py "$PR"
   # rework loop: CI fixes its own-repo PRs and reviews them again (tools/decide.py gate, MAX_ROUNDS).
   # Unlike `review`, this job runs the PR's code (its tests) — only for same-repo branches, pushed by people with
-  # write access (or this bot) who could run any workflow anyway; forks never get here. No `actions: write`, no
-  # persisted git credentials: the agent only commits, a hook-less step pushes, a separate job dispatches.
+  # write access (or this bot) who could run any workflow anyway; forks never get here. The trust rests on those
+  # branches carrying no injected content (nightly ones are bot-made from main). No `actions: write`, no persisted
+  # git credentials: the agent only commits, a hook-less step pushes, a separate job dispatches. Don't widen its tools.
   rework:
     needs: review
     if: ${{ !cancelled() }}
@@ -105,7 +106,9 @@ jobs:
           B: ${{ steps.gate.outputs.branch }}
           T: ${{ github.token }}
         # hooks off: the PR's code ran in this job and may have planted one
-        run: git -c core.hooksPath=/dev/null push -q "https://x-access-token:$T@github.com/${{ github.repository }}.git" "HEAD:refs/heads/$B"
+        run: |
+          auth=$(printf 'x-access-token:%s' "$T" | base64 -w0)
+          git -c core.hooksPath=/dev/null -c http.extraheader="AUTHORIZATION: basic $auth" push -q origin "HEAD:refs/heads/$B"
   again:
     needs: rework
     if: needs.rework.outputs.branch != ''
