@@ -52,21 +52,21 @@ jobs:
       - name: merge, rework or reject
         run: python3 tools/decide.py "$PR"
   # rework loop: CI fixes its own-repo PRs and reviews them again (tools/decide.py gate, MAX_ROUNDS).
-  # Unlike `review`, this job runs the PR's code (its tests) — only for same-repo branches, pushed by people with
-  # write access (or this bot) who could run any workflow anyway; forks never get here. The trust rests on those
-  # branches carrying no injected content (nightly ones are bot-made from main). No `actions: write`, no persisted
-  # git credentials: the agent only commits, a hook-less step pushes, a separate job dispatches. Don't widen its tools.
+  # Unlike `review`, this job runs the PR's code (its tests), with CLAUDE_CODE_OAUTH_TOKEN in the environment —
+  # only for same-repo branches, pushed by people with write access (or this bot, from main) who could run any
+  # workflow with that secret anyway; forks never get here. Its token is read-only for contents: the commits leave
+  # as a bundle, `push` fast-forwards them from a clean checkout, `again` dispatches. Don't widen its tools.
   rework:
     needs: review
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
-      id-token: write
     outputs:
       branch: ${{ steps.gate.outputs.branch }}
+      changed: ${{ steps.bundle.outputs.changed }}
     env:
       PR: ${{ github.event.pull_request.number || inputs.pr }}
     steps:
@@ -100,18 +100,40 @@ jobs:
             Finally `gh pr comment ${{ env.PR }}` — one line per item: fixed / skipped and why.
           claude_args: >-
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(python3 -m unittest:*),Bash(python3 tools/metrics.py:*),Bash(git add:*),Bash(git commit:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git merge:*),Bash(git fetch:*),Bash(ls:*),Bash(wc:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
-      - name: push
+      - name: bundle the new commits
+        id: bundle
         if: steps.gate.outputs.branch != ''
         env:
           B: ${{ steps.gate.outputs.branch }}
-          T: ${{ github.token }}
-        # hooks off: the PR's code ran in this job and may have planted one
         run: |
-          auth=$(printf 'x-access-token:%s' "$T" | base64 -w0)
-          git -c core.hooksPath=/dev/null -c http.extraheader="AUTHORIZATION: basic $auth" push -q origin "HEAD:refs/heads/$B"
-  again:
+          [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$B")" ] || exit 0
+          git bundle create "$RUNNER_TEMP/rework.bundle" "origin/$B..HEAD" && echo changed=1 >> "$GITHUB_OUTPUT"
+      - if: steps.bundle.outputs.changed
+        uses: actions/upload-artifact@v4
+        with:
+          name: rework-${{ github.run_id }}
+          path: ${{ runner.temp }}/rework.bundle
+          retention-days: 1
+  push:
     needs: rework
-    if: needs.rework.outputs.branch != ''
+    if: needs.rework.outputs.changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      B: ${{ needs.rework.outputs.branch }}
+    steps:
+      # a clean checkout, nothing from the PR runs here; the push is a fast-forward of the branch only
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: rework-${{ github.run_id }}
+          path: ${{ runner.temp }}
+      - run: git fetch -q origin "$B" && git fetch -q "$RUNNER_TEMP/rework.bundle" HEAD && git push -q origin "FETCH_HEAD:refs/heads/$B"
+  again:
+    needs: [rework, push]
     runs-on: ubuntu-latest
     permissions:
       actions: write
