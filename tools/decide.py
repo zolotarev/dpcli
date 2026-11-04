@@ -107,7 +107,7 @@ def gate(pr):
     stuck = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
     if stuck:
         if "nightly-simplify" in {x["name"] for x in info["labels"]}:  # a fresh one from main is cheaper
-            gh("pr", "close", pr, "--delete-branch", "--comment", f"{STOP} ({stuck}): closed, the next nightly starts from main.")
+            gh("pr", "close", pr,"--comment", f"{STOP} ({stuck}): closed, the next nightly starts from main.")
         elif not any(b.startswith(STOP) for b in bot):
             gh("pr", "comment", pr, "--body", f"{STOP} ({stuck}): the author's turn.")
         return "", ""
