@@ -11,6 +11,7 @@ import time
 
 REVIEWERS = {"github-actions", "github-actions[bot]", "app/github-actions"}
 MAX_ROUNDS = 5  # automatic rework rounds per PR; then it waits for its author (nightly: closed by the next nightly)
+ROUND, STOP = "Auto-rework round", "Auto-rework stopped"
 
 
 def gh(*a, check=True):
@@ -99,12 +100,15 @@ def gate(pr):
     if info["state"] != "OPEN" or "rework" not in {x["name"] for x in info["labels"]} or info["isCrossRepository"]:
         return "", ""
     bot = [c["body"] for c in info["comments"] if (c.get("author") or {}).get("login") in REVIEWERS]
-    rounds = sum(b.startswith("VERDICT: rework") for b in bot)
-    if rounds > MAX_ROUNDS:
-        gh("pr", "comment", pr, "--body", f"Auto-rework stopped after {MAX_ROUNDS} rounds: the author's turn.")
+    rounds = sum(b.startswith(ROUND) for b in bot)  # own marks: any way into `rework` (red tests, failed merge) counts
+    if rounds >= MAX_ROUNDS:
+        if not any(b.startswith(STOP) for b in bot):
+            gh("pr", "comment", pr, "--body", f"{STOP} after {MAX_ROUNDS} rounds: the author's turn.")
         return "", ""
     last = max((i for i, b in enumerate(bot) if b.startswith("VERDICT:")), default=0)
-    return info["headRefName"], "\n\n".join(bot[last:])
+    review = "\n\n".join(bot[last:])
+    gh("pr", "comment", pr, "--body", f"{ROUND} {rounds + 1}/{MAX_ROUNDS}.")
+    return info["headRefName"], review
 
 
 if __name__ == "__main__":
