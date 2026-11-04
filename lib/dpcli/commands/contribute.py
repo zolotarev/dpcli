@@ -82,7 +82,7 @@ def cmd_contribute(a):
         return home(dist, branch)
     if not a.new:
         dup = similar(repo, title)
-        if dup and commits and "/issues/" in dup["url"]:  # a fix for a known issue: the PR closes it, no +1
+        if dup and commits and "/issues/" in dup["url"] and dup["title"].lower() == title.lower():  # a fix for a known issue (exact title only): merge closes it
             body += f"\nFixes #{dup['number']}\n"
         elif dup:
             r = run("gh", "issue", "comment", str(dup["number"]), "--repo", repo, "--body",

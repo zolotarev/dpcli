@@ -202,5 +202,32 @@ class Gate(unittest.TestCase):
         self.assertEqual(self.run_gate(c, cross=True)[0][0], "")
         self.assertEqual(self.run_gate(c, labels=())[0][0], "")
 
+
+class CloseAfterMerge(unittest.TestCase):
+    """decide.main on an accepted, green PR: the issues it fixes are closed, with the release tag when there is one."""
+
+    def run_main(self, tag):
+        calls = []
+
+        def gh(*a, **k):
+            calls.append(a)
+            if "comments" in a:
+                return json.dumps({"comments": [{"author": {"login": "github-actions"}, "body": "VERDICT: accept"}]})
+            if "closingIssuesReferences" in a:
+                return json.dumps({"closingIssuesReferences": [{"number": 5}]})
+            return ""
+        with mock.patch.object(decide, "gh", gh), mock.patch.object(decide, "approve", lambda pr: []), \
+                mock.patch.object(decide, "tests_state", lambda pr: "success"), mock.patch.object(decide, "release", lambda: tag), \
+                mock.patch.object(decide.subprocess, "run", lambda *a, **k: mock.Mock(returncode=0, stdout="", stderr="")):
+            decide.main("7")
+        return [a for a in calls if a[:2] == ("issue", "close")]
+
+    def test_closes_with_and_without_release(self):
+        self.assertIn("released in v41", self.run_main("v41")[0][-1])
+        closes = self.run_main(None)
+        self.assertEqual(closes[0][2], "5")
+        self.assertNotIn("released", closes[0][-1])
+
+
 if __name__ == "__main__":
     unittest.main()

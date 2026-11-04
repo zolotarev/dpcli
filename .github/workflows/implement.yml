@@ -40,7 +40,7 @@ jobs:
         run: |
           q='.[] | select(.pull_request | not) | select(.state == "open")
              | select(.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
-             | select(any(.labels[]; .name == "feedback")) | .number'
+             | select(any(.labels[]; .name == "feedback")) | select(any(.labels[]; .name == "triaged") | not) | .number'
           if [ -n "$N" ]; then c=$(gh api "repos/$GITHUB_REPOSITORY/issues/$N" --jq "[.] | $q")
           else c=$(gh api "repos/$GITHUB_REPOSITORY/issues?labels=feedback&state=open&sort=created&direction=asc&per_page=50" --jq "$q"); fi
           for i in $c; do
@@ -75,6 +75,10 @@ jobs:
             git bundle create "$RUNNER_TEMP/issue.bundle" origin/main..HEAD && echo changed=1 >> "$GITHUB_OUTPUT"
           elif [ -s "$RUNNER_TEMP/skip.md" ]; then
             gh issue close "$I" --reason "not planned" --comment "$(printf 'Not a dpcli change (automatic triage; reopen to retry):\n\n'; cat "$RUNNER_TEMP/skip.md")"
+          else  # no change, no reason: label it so the daily sweep does not pay for it again
+            gh label create triaged --color BFD4F2 2>/dev/null || true
+            gh issue edit "$I" --add-label triaged
+            gh issue comment "$I" --body "Automatic triage: the agent made no change and gave no reason; labelled triaged, a human decides."
           fi
       - if: steps.bundle.outputs.changed
         uses: actions/upload-artifact@v4
