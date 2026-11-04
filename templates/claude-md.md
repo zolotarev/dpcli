@@ -8,7 +8,7 @@ Before multi-step work read **`{{workflow}}`**. Journal, tasks, branches, docs �
 - Deterministic work — `{{cli}}` commands; the journal `{{plan_dir}}/<m>/` is append-only.
 - Correctness over "looks nice"; don't invent; don't polish.
 - One session — one phase/module: after a merge or a change of topic — `/clear`, state comes from the journal.
-- Process frictions — at once, one line `harness: …` (in `dp_feedback` or `event <m> note`); review and process changes — skill `harness-retro`, only with the user's approval.
+- Process frictions — at once, one line `harness: …` (in `dp_feedback` or `event <m> note`); review and process changes — skill `harness-retro`, on its own, the user is told after.
 - Docs — entry `{{docs_dir}}/INDEX.md`; find with `{{cli}} docs find`, read by section `{{cli}} docs section <path> [section]`, not whole.
 - Commits — only your own files (`git commit -- <paths>`); no push without the user's command; after a merge `{{cli}} gc --remove`.
 - Agents — `.dpcli/agents/`, process — `.dpcli/templates/workflow.md`; `.claude/` is refreshed by `{{cli}} init`.

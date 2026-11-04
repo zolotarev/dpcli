@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 from .. import VERSION, config, gitx, reexec
 from ..util import CLI, append_jsonl, lang_commit, now, read_json, short, write_json
@@ -50,13 +51,12 @@ def cmd_update(a):
         write_json(pin_file(), {"pin": a.pin} if a.pin else {})
         print(f"dpcli pinned to {a.pin}" if a.pin else "dpcli unpinned")
         return
-    if a.auto:
+    if a.auto:  # at most hourly: releases land within the hour of a merge, own PRs move as fast
         st = stamp_file()
-        today = dt.date.today().isoformat()
-        if st.is_file() and st.read_text().strip() == today:
+        if st.is_file() and time.time() - st.stat().st_mtime < 3600:
             return
         st.parent.mkdir(parents=True, exist_ok=True)
-        st.write_text(today + "\n")
+        st.write_text(dt.datetime.now().isoformat() + "\n")
     lines = check_prs()  # first: a merged PR frees .dpcli from its improve/* branch before the update
     if not a.prs_only:
         lines += update_dist(a)
@@ -155,7 +155,7 @@ def check_prs():
             out.append(f"{tag} rejected → {fid}: {why or 'see the PR'} — drop it or solve in .dpcli-local/ (harness-retro)")
         elif "rework" in labels and c["status"] != "rework":
             append_jsonl(ledger_path(), {"t": now(), "id": fid, "kind": "rework", "why": why})
-            out.append(f"{tag} rework → {fid}: {why or 'see the review'} — rework on its improve/* branch or drop (harness-retro)")
+            out.append(f"{tag} rework → {fid}: {why or 'see the review'} — CI reworks own-repo PRs; else: .dpcli to its improve/{fid}-* branch, fix, {CLI} contribute {fid}")
     return out
 
 
@@ -179,7 +179,7 @@ def unsent():
 
 def register(sp):
     q = sp.add_parser("update", help="update the .dpcli submodule to the latest release, re-render, commit; check own PRs")
-    q.add_argument("--auto", action="store_true", help="at most once a day, silent when nothing happened (SessionStart hook)")
+    q.add_argument("--auto", action="store_true", help="at most once an hour, silent when nothing happened (SessionStart hook)")
     q.add_argument("--check", action="store_true", help="only tell whether a new version is available")
     q.add_argument("--prs-only", dest="prs_only", action="store_true", help="only check own PRs/issues at the hub")
     g = q.add_mutually_exclusive_group()

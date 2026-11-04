@@ -120,9 +120,50 @@ class Contribute(unittest.TestCase):
         out = self.p.ok("contribute", "F-1", env=self.env)
         self.assertIn("pull/12", out)
         self.assertIn("committed on improve/F-1-long-accept-blocks-the-agent: x.txt", out)
-        self.assertEqual(git("branch", "--show-current", cwd=self.dist), "improve/F-1-long-accept-blocks-the-agent")
-        self.assertEqual(git("log", "-1", "--format=%s", cwd=self.dist), "Long accept blocks the agent")
+        self.assertEqual(git("branch", "--show-current", cwd=self.dist), "main")  # pushed: back on main, update goes on
+        self.assertEqual(git("log", "-1", "--format=%s", "improve/F-1-long-accept-blocks-the-agent", cwd=self.dist),
+                         "Long accept blocks the agent")
         self.assertIn("improve/F-1-long-accept-blocks-the-agent", git("ls-remote", str(self.origin), cwd=self.dist))
+
+    def test_rework_pushes_to_the_own_pr_not_a_plus_one(self):
+        (self.dist / "x.txt").write_text("x")
+        self.p.ok("contribute", "F-1", env=self.env)
+        git("switch", "-q", "improve/F-1-long-accept-blocks-the-agent", cwd=self.dist)  # as the rework hint says
+        (self.dist / "x.txt").write_text("x reworked")
+        own = json.dumps([{"number": 12, "title": "Long accept blocks the agent", "url": "https://github.com/o/r/pull/12"}])
+        out = self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": own})
+        self.assertIn("pushed to https://github.com/o/r/pull/12", out)
+        self.assertEqual(sum(c[:2] == ["pr", "create"] for c in self.calls()), 1)
+        self.assertFalse(any(c[:2] == ["issue", "comment"] for c in self.calls()))
+        b = "improve/F-1-long-accept-blocks-the-agent"
+        self.assertEqual(git("rev-parse", b, cwd=self.dist), git("ls-remote", str(self.origin), b, cwd=self.dist).split()[0])
+        self.assertEqual(git("branch", "--show-current", cwd=self.dist), "main")
+        git("switch", "-q", b, cwd=self.dist)
+        code, _, err = self.p.run("contribute", "F-1", env=self.env)  # nothing new: no empty push, no reopen
+        self.assertEqual(code, 1)
+        self.assertIn("nothing new", err)
+        other = self.p.tmp / "other"  # CI pushed its rework to the branch meanwhile
+        git("clone", "-q", "-b", b, str(self.origin), str(other), cwd=self.p.tmp)
+        (other / "y.txt").write_text("ci")
+        git("add", "y.txt", cwd=other)
+        git("-c", "user.name=ci", "-c", "user.email=ci@x", "commit", "-q", "-m", "ci rework", cwd=other)
+        git("push", "-q", "origin", b, cwd=other)
+        (self.dist / "x.txt").write_text("x again")
+        code, _, err = self.p.run("contribute", "F-1", env=self.env)
+        self.assertEqual(code, 1)
+        self.assertIn("pull --rebase", err)
+
+    def test_plus_one_goes_home_and_a_failed_switch_is_said(self):
+        self.improve()
+        similar = json.dumps([{"number": 5, "title": "Long accept blocks agents", "url": "https://github.com/o/r/issues/5"}])
+        self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar})
+        self.assertEqual(git("branch", "--show-current", cwd=self.dist), "main")  # +1 sent: back on main
+        self.p.ok("feedback", "new", "Other", "--match", "zzz", "--scope", "dpcli")
+        git("switch", "-q", "-c", "improve/F-2-x", cwd=self.dist)
+        git("worktree", "add", "-q", str(self.p.tmp / "wt"), "main", cwd=self.dist)  # the way back fails: said, not silent
+        (self.dist / "y.txt").write_text("y")
+        out = self.p.ok("contribute", "F-2", env=self.env)
+        self.assertIn(".dpcli stays on improve/F-2-x, updates skip", out)
 
     def test_no_gh_writes_patch(self):
         self.improve()

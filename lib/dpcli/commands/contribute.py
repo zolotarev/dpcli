@@ -70,6 +70,16 @@ def cmd_contribute(a):
     if not gh_ok():
         return offline(a.id, title, body, commits, dist)
     repo = hub(dist)
+    if "/pull/" in c.get("pr", "") and c["status"] in ("open", "rework"):  # the own PR: rework, never a +1 on itself
+        r = run("git", "log", "--oneline", "@{u}..HEAD", cwd=dist)
+        if r.returncode:
+            raise DpError(f"{a.id}: {branch or 'HEAD'} has no upstream: switch .dpcli to the improve/{a.id}-* branch of {c['pr']}")
+        if not r.stdout.strip():
+            raise DpError(f"{a.id}: nothing new for {c['pr']}: switch .dpcli to its improve/{a.id}-* branch, fix, contribute")
+        push(dist)
+        append_jsonl(ledger_path(), {"t": now(), "id": a.id, "kind": "reopen"})
+        print(f"{a.id}: pushed to {c['pr']} (reviewed again)")
+        return home(dist, branch)
     if not a.new:
         dup = similar(repo, title)
         if dup:
@@ -79,11 +89,12 @@ def cmd_contribute(a):
                 raise DpError(f"gh issue comment: {r.stderr.strip()}")
             record(a.id, "pr" if "/pull/" in dup["url"] else "issue", dup["url"])
             print(f"{a.id}: +1 on {dup['url']} (similar: «{dup['title']}»; new one anyway — --new)")
-            return
+            return home(dist, branch)
     if commits:
         url = open_pr(repo, dist, branch, title, body)
         record(a.id, "pr", url)
         print(f"{a.id}: PR {url}")
+        home(dist, branch)
     else:
         r = run("gh", "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label", "feedback")
         if r.returncode:
@@ -115,9 +126,7 @@ def open_pr(repo, dist, branch, title, body):
             if r.returncode:
                 raise DpError(f"gh repo fork: {r.stderr.strip()}")
         remote, head = "fork", f"{run('gh', 'api', 'user', '--jq', '.login').stdout.strip()}:{branch}"
-    r = run("git", "push", "-q", "-u", remote, "HEAD", cwd=dist)
-    if r.returncode:
-        raise DpError(f"git push {remote}: {r.stderr.strip()}")
+    push(dist, "-u", remote, "HEAD")
     args = ["gh", "pr", "create", "--repo", repo, "--base", "main", "--head", head, "--title", title, "--body", body]
     r = run(*args, "--label", "feedback", cwd=dist)
     if r.returncode and not can_push:  # fork authors may not be allowed to label
@@ -125,6 +134,25 @@ def open_pr(repo, dist, branch, title, body):
     if r.returncode:
         raise DpError(f"gh pr create: {r.stderr.strip()}")
     return r.stdout.strip().splitlines()[-1]
+
+
+def push(dist, *args):
+    r = run("git", "push", "-q", *args, cwd=dist)
+    if r.returncode:  # rejected: mostly CI pushed its rework to the branch meanwhile
+        raise DpError(f"git push: {r.stderr.strip()[-300:]}"
+                      + ("\nthe branch moved: git -C .dpcli pull --rebase, then contribute again" if "rejected" in r.stderr else ""))
+
+
+def home(dist, branch):
+    """Sent: .dpcli back to main, so `update` keeps running while the PR is reviewed (the branch stays)."""
+    if not branch.startswith("improve/"):
+        return
+    r = run("git", "switch", "-q", "main", cwd=dist)
+    if r.returncode:
+        print(f".dpcli stays on {branch}, updates skip: {r.stderr.strip()[-200:]} — fix, then git -C .dpcli switch main")
+    else:
+        print(f".dpcli back on main: updates go on, the fix comes with its release; "
+              f"rework: git -C .dpcli switch {branch}, edit, {CLI} contribute again")
 
 
 def outbox(fid):
