@@ -34,21 +34,28 @@ def tests_state(pr, timeout=1800):
     (pull_request, or workflow_dispatch for PRs opened by workflows — those are not PR checks).
     Runs waiting for approval (first-time contributors) are approved: `test` runs on pull_request
     without secrets and with a read-only token (owner's decision: fully automatic hub)."""
-    sha = json.loads(gh("pr", "view", pr, "--json", "headRefOid"))["headRefOid"]
-    repo = os.environ.get("GITHUB_REPOSITORY", "")
     t0 = time.time()
     while True:
-        runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json",
-                             "databaseId,status,conclusion", check=False) or "[]")
-        for r in runs:
-            if r["status"] in ("waiting", "action_required") or r.get("conclusion") == "action_required":
-                gh("api", "-X", "POST", f"repos/{repo}/actions/runs/{r['databaseId']}/approve", check=False)
+        runs = approve(pr)
         done = [r for r in runs if r["status"] == "completed" and r.get("conclusion") != "action_required"]
         if done:
             return "success" if done[0]["conclusion"] == "success" else "failure"
         if time.time() - t0 > timeout:
             return "missing" if not runs else "failure"
         time.sleep(30)
+
+
+def approve(pr):
+    """Approves `test` runs on the PR head waiting for approval (first-time contributors, and pushes or PRs made by
+    this bot's token — GitHub holds those too) -> the runs."""
+    sha = json.loads(gh("pr", "view", pr, "--json", "headRefOid"))["headRefOid"]
+    runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json",
+                         "databaseId,status,conclusion", check=False) or "[]")
+    for r in runs:
+        if r["status"] in ("waiting", "action_required") or r.get("conclusion") == "action_required":
+            gh("api", "-X", "POST", f"repos/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{r['databaseId']}/approve",
+               check=False)
+    return runs
 
 
 def release():
@@ -66,6 +73,7 @@ def release():
 
 
 def main(pr):
+    approve(pr)  # whatever the verdict: no run is left waiting for a human
     comments = json.loads(gh("pr", "view", pr, "--json", "comments"))["comments"]
     # only the reviewer's own comments count: anyone (the PR author too) can write "VERDICT: accept"
     body = next((c["body"] for c in reversed(comments) if (c.get("author") or {}).get("login") in REVIEWERS
