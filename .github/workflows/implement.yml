@@ -12,7 +12,7 @@ on:
         description: issue number (empty — the oldest open one)
         required: false
 concurrency:
-  group: implement-${{ github.event.issue.number || inputs.issue || 'sweep' }}
+  group: implement  # one at a time: an `opened` run and the sweep never pick the same issue
 permissions: {}
 jobs:
   implement:
@@ -76,12 +76,10 @@ jobs:
             git bundle create "$RUNNER_TEMP/issue.bundle" origin/main..HEAD && echo changed=1 >> "$GITHUB_OUTPUT"
           elif [ -s "$RUNNER_TEMP/skip.md" ]; then
             gh issue close "$I" --reason "not planned" --comment "$(printf 'Not a dpcli change (automatic triage; reopen to retry):\n\n'; cat "$RUNNER_TEMP/skip.md")"
-          else  # no change, no reason: label it so the daily sweep does not pay for it again
-            gh label create triaged --color BFD4F2 2>/dev/null || true
-            gh issue edit "$I" --add-label triaged
-            gh issue comment "$I" --body "Automatic triage: the agent made no change and gave no reason; labelled triaged, a human decides."
+          else
+            echo "no change and no reason" >&2; exit 1
           fi
-      - name: failed run, label it so the daily sweep does not retry it
+      - name: failed (or no change and no reason), label it so the daily sweep does not retry it
         if: failure() && steps.pick.outputs.issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -89,7 +87,7 @@ jobs:
         run: |
           gh label create triaged --color BFD4F2 2>/dev/null || true
           gh issue edit "$I" --add-label triaged
-          gh issue comment "$I" --body "Automatic implementation failed (see the run); labelled triaged, a human decides."
+          gh issue comment "$I" --body "Automatic implementation failed or gave up (run $GITHUB_RUN_ID); labelled triaged, a human decides."
       - if: steps.bundle.outputs.changed
         uses: actions/upload-artifact@v4
         with:
@@ -118,10 +116,8 @@ jobs:
           name: issue-${{ github.run_id }}
           path: ${{ runner.temp }}
       - run: |
-          if ! { git fetch -q "$RUNNER_TEMP/issue.bundle" HEAD && git push -q origin "FETCH_HEAD:refs/heads/issue/$I"; }; then
-            gh label create triaged --color BFD4F2 2>/dev/null; gh issue edit "$I" --add-label triaged
-            gh issue comment "$I" --body "Automatic implementation could not be pushed (workflow files or a race); labelled triaged, a human decides."; exit 1
-          fi
+          git fetch -q "$RUNNER_TEMP/issue.bundle" HEAD && git push -q origin "FETCH_HEAD:refs/heads/issue/$I" ||
+            { gh issue edit "$I" --add-label triaged; exit 1; }  # not pushable (a workflow file): no daily retry
           url=$(gh pr create --base main --head "issue/$I" --label feedback --title "$(gh issue view "$I" --json title --jq .title)" \
                 --body "$(printf 'Fixes #%s\n\nImplemented by CI from the friction report.\n' "$I")")
           # PRs and pushes by the workflow token start no workflows; dispatches do

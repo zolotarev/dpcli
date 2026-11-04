@@ -135,10 +135,7 @@ def check_prs():
     for fid, c in todo.items():
         url = c["pr"]
         kind = "pr" if "/pull/" in url else "issue"
-        for fields in ("state,labels,comments,stateReason", "state,labels,comments")[kind == "pr":]:  # older gh: no stateReason
-            r = run("gh", kind, "view", url, "--json", fields, timeout=20)
-            if not r.returncode:
-                break
+        r = run("gh", kind, "view", url, "--json", "state,labels,comments" + (",stateReason" if kind == "issue" else ""), timeout=20)
         try:
             info = json.loads(r.stdout)
         except (json.JSONDecodeError, TypeError):
