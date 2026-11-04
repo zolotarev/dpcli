@@ -12,6 +12,7 @@ import time
 REVIEWERS = {"github-actions", "github-actions[bot]", "app/github-actions"}
 MAX_ROUNDS = 5  # automatic rework rounds per PR; then it waits for its author (nightly: closed by the next nightly)
 ROUND, STOP = "Auto-rework round", "Auto-rework stopped"
+WORKFLOWS = "main changed .github/workflows"  # tools/sync.py: the workflow token may not push such a merge
 
 
 def gh(*a, check=True):
@@ -101,12 +102,15 @@ def gate(pr):
         return "", ""
     bot = [c["body"] for c in info["comments"] if (c.get("author") or {}).get("login") in REVIEWERS]
     rounds = sum(b.startswith(ROUND) for b in bot)  # own marks: any way into `rework` (red tests, failed merge) counts
-    if rounds >= MAX_ROUNDS:
-        if not any(b.startswith(STOP) for b in bot):
-            gh("pr", "comment", pr, "--body", f"{STOP} after {MAX_ROUNDS} rounds: the author's turn.")
-        return "", ""
     last = max((i for i, b in enumerate(bot) if b.startswith("VERDICT:")), default=0)
     review = "\n\n".join(bot[last:])
+    stuck = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
+    if stuck:
+        if "nightly-simplify" in {x["name"] for x in info["labels"]}:  # a fresh one from main is cheaper
+            gh("pr", "close", pr, "--delete-branch", "--comment", f"{STOP} ({stuck}): closed, the next nightly starts from main.")
+        elif not any(b.startswith(STOP) for b in bot):
+            gh("pr", "comment", pr, "--body", f"{STOP} ({stuck}): the author's turn.")
+        return "", ""
     gh("pr", "comment", pr, "--body", f"{ROUND} {rounds + 1}/{MAX_ROUNDS}.")
     return info["headRefName"], review
 
