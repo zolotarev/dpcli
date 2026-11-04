@@ -25,8 +25,6 @@ jobs:
     outputs:
       issue: ${{ steps.pick.outputs.issue }}
       changed: ${{ steps.bundle.outputs.changed }}
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,6 +34,7 @@ jobs:
       - name: pick an issue without a PR
         id: pick
         env:
+          GH_TOKEN: ${{ github.token }}  # not job-wide: the agent's tests run in this job
           N: ${{ github.event.issue.number || inputs.issue }}
         run: |
           q='.[] | select(.pull_request | not) | select(.state == "open")
@@ -45,7 +44,7 @@ jobs:
           else c=$(gh api "repos/$GITHUB_REPOSITORY/issues?labels=feedback&state=open&sort=created&direction=asc&per_page=50" --jq "$q"); fi
           for i in $c; do
             git ls-remote --exit-code origin "refs/heads/issue/$i" >/dev/null && continue  # tried already
-            [ "$(gh pr list --state open --search "Fixes #$i in:body" --json body --jq "[.[] | select(.body | test(\"Fixes #$i\\\\b\"))] | length")" = 0 ] || continue
+            [ "$(gh pr list --state open --search "#$i in:body" --json body --jq "[.[] | select(.body | test(\"(Fixes|Related:) #$i\\\\b\"))] | length")" = 0 ] || continue
             gh issue view "$i" --json title,body --jq '"# \(.title)\n\n\(.body)"' > "$RUNNER_TEMP/issue.md"
             echo "issue=$i" >> "$GITHUB_OUTPUT"; break
           done
@@ -70,6 +69,7 @@ jobs:
         id: bundle
         if: steps.pick.outputs.issue
         env:
+          GH_TOKEN: ${{ github.token }}
           I: ${{ steps.pick.outputs.issue }}
         run: |
           if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
@@ -81,6 +81,15 @@ jobs:
             gh issue edit "$I" --add-label triaged
             gh issue comment "$I" --body "Automatic triage: the agent made no change and gave no reason; labelled triaged, a human decides."
           fi
+      - name: failed run, label it so the daily sweep does not retry it
+        if: failure() && steps.pick.outputs.issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          I: ${{ steps.pick.outputs.issue }}
+        run: |
+          gh label create triaged --color BFD4F2 2>/dev/null || true
+          gh issue edit "$I" --add-label triaged
+          gh issue comment "$I" --body "Automatic implementation failed (see the run); labelled triaged, a human decides."
       - if: steps.bundle.outputs.changed
         uses: actions/upload-artifact@v4
         with:

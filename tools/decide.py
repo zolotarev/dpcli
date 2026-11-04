@@ -97,6 +97,8 @@ def main(pr):
             tag = release()
             # closing keywords: GitHub may skip them for the workflow token's merge
             for i in json.loads(gh("pr", "view", pr, "--json", "closingIssuesReferences", check=False) or "{}").get("closingIssuesReferences", []):
+                if gh("issue", "view", str(i["number"]), "--json", "state", "--jq", ".state", check=False).strip() != "OPEN":
+                    continue  # GitHub already closed it
                 gh("issue", "close", str(i["number"]), "--comment", f"Fixed by #{pr}" + (f", released in {tag}." if tag else "."), check=False)
             return print(f"#{pr}: merged" + (f", released {tag}" if tag else ""))
         gh("pr", "comment", pr, "--body", f"Review accepted, but the `test` workflow is {state}: fix and push again.")

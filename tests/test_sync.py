@@ -206,6 +206,8 @@ class Gate(unittest.TestCase):
 class CloseAfterMerge(unittest.TestCase):
     """decide.main on an accepted, green PR: the issues it fixes are closed, with the release tag when there is one."""
 
+    state = "OPEN"
+
     def run_main(self, tag):
         calls = []
 
@@ -215,6 +217,8 @@ class CloseAfterMerge(unittest.TestCase):
                 return json.dumps({"comments": [{"author": {"login": "github-actions"}, "body": "VERDICT: accept"}]})
             if "closingIssuesReferences" in a:
                 return json.dumps({"closingIssuesReferences": [{"number": 5}]})
+            if a[:2] == ("issue", "view"):
+                return self.state
             return ""
         with mock.patch.object(decide, "gh", gh), mock.patch.object(decide, "approve", lambda pr: []), \
                 mock.patch.object(decide, "tests_state", lambda pr: "success"), mock.patch.object(decide, "release", lambda: tag), \
@@ -227,6 +231,8 @@ class CloseAfterMerge(unittest.TestCase):
         closes = self.run_main(None)
         self.assertEqual(closes[0][2], "5")
         self.assertNotIn("released", closes[0][-1])
+        self.state = "CLOSED"  # GitHub closed it itself: no second comment
+        self.assertEqual(self.run_main(None), [])
 
 
 if __name__ == "__main__":
