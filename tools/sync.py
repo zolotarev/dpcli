@@ -12,7 +12,7 @@ import re
 import subprocess
 import sys
 
-from decide import gh, label
+from decide import WORKFLOWS, gh, label
 
 INIT, LOG = "lib/dpcli/__init__.py", "CHANGELOG.md"
 HUNK = re.compile(r"^<<<<<<< [^\n]*\n(.*?)^=======\n(.*?)^>>>>>>> [^\n]*\n", re.M | re.S)
@@ -82,7 +82,7 @@ def main(pr):
             block(pr, f"conflicts with main in {', '.join(sorted(conflicts))}; merge main into the fork branch and push")
         return print(f"#{pr}: fork, merges cleanly with main; reviewed as is")
     if git("diff", "--name-only", f"{head}...origin/main", "--", ".github/workflows").stdout.strip():
-        block(pr, "main changed .github/workflows since this branch, and the CI token may not push workflow files; "
+        block(pr, f"{WORKFLOWS} since this branch, and the CI token may not push workflow files; "
                   "merge main into the branch and push (not a conflict)")
     show = lambda ref, f: git("show", f"{ref}:{f}", check=False).stdout
     try:

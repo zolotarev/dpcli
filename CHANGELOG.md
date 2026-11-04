@@ -1,5 +1,8 @@
 # Changelog
 
+## 39
+- CI rework loop: a PR that main's workflow changes block is not reworked, since the workflow token may not push such a merge. It goes to its author, and a nightly PR stuck this way or past 5 rounds is closed at once. The `push` and `again` jobs no longer stop when `review` failed in sync. The rework agent's comment never starts with `VERDICT:`. `decide.py` approves `test` runs held for approval (GitHub holds those started by the bot's own pushes and PRs) on every verdict, not only on accept.
+
 ## 38
 - Autonomous loop. Hub CI reworks a PR from its own branches after a `rework` verdict, then tests and reviews it again, up to 5 rounds (`tools/decide.py --gate`). `contribute` puts `.dpcli` back on `main` after the PR, so updates keep coming. Called again with commits, it pushes to the same PR instead of +1-ing it. `update --auto` runs hourly, not daily. `harness-retro` applies its ≤ 3 changes without asking and then tells the user.
 

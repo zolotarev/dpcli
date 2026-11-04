@@ -12,6 +12,7 @@ import time
 REVIEWERS = {"github-actions", "github-actions[bot]", "app/github-actions"}
 MAX_ROUNDS = 5  # automatic rework rounds per PR; then it waits for its author (nightly: closed by the next nightly)
 ROUND, STOP = "Auto-rework round", "Auto-rework stopped"
+WORKFLOWS = "main changed .github/workflows"  # tools/sync.py: the workflow token may not push such a merge
 
 
 def gh(*a, check=True):
@@ -33,21 +34,28 @@ def tests_state(pr, timeout=1800):
     (pull_request, or workflow_dispatch for PRs opened by workflows — those are not PR checks).
     Runs waiting for approval (first-time contributors) are approved: `test` runs on pull_request
     without secrets and with a read-only token (owner's decision: fully automatic hub)."""
-    sha = json.loads(gh("pr", "view", pr, "--json", "headRefOid"))["headRefOid"]
-    repo = os.environ.get("GITHUB_REPOSITORY", "")
     t0 = time.time()
     while True:
-        runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json",
-                             "databaseId,status,conclusion", check=False) or "[]")
-        for r in runs:
-            if r["status"] in ("waiting", "action_required") or r.get("conclusion") == "action_required":
-                gh("api", "-X", "POST", f"repos/{repo}/actions/runs/{r['databaseId']}/approve", check=False)
+        runs = approve(pr)
         done = [r for r in runs if r["status"] == "completed" and r.get("conclusion") != "action_required"]
         if done:
             return "success" if done[0]["conclusion"] == "success" else "failure"
         if time.time() - t0 > timeout:
             return "missing" if not runs else "failure"
         time.sleep(30)
+
+
+def approve(pr):
+    """Approves `test` runs on the PR head waiting for approval (first-time contributors, and pushes or PRs made by
+    this bot's token — GitHub holds those too) -> the runs."""
+    sha = json.loads(gh("pr", "view", pr, "--json", "headRefOid"))["headRefOid"]
+    runs = json.loads(gh("run", "list", "--workflow", "test.yml", "--commit", sha, "--json",
+                         "databaseId,status,conclusion", check=False) or "[]")
+    for r in runs:
+        if r["status"] in ("waiting", "action_required") or r.get("conclusion") == "action_required":
+            gh("api", "-X", "POST", f"repos/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{r['databaseId']}/approve",
+               check=False)
+    return runs
 
 
 def release():
@@ -65,6 +73,7 @@ def release():
 
 
 def main(pr):
+    approve(pr)  # whatever the verdict: no run is left waiting for a human
     comments = json.loads(gh("pr", "view", pr, "--json", "comments"))["comments"]
     # only the reviewer's own comments count: anyone (the PR author too) can write "VERDICT: accept"
     body = next((c["body"] for c in reversed(comments) if (c.get("author") or {}).get("login") in REVIEWERS
@@ -101,12 +110,15 @@ def gate(pr):
         return "", ""
     bot = [c["body"] for c in info["comments"] if (c.get("author") or {}).get("login") in REVIEWERS]
     rounds = sum(b.startswith(ROUND) for b in bot)  # own marks: any way into `rework` (red tests, failed merge) counts
-    if rounds >= MAX_ROUNDS:
-        if not any(b.startswith(STOP) for b in bot):
-            gh("pr", "comment", pr, "--body", f"{STOP} after {MAX_ROUNDS} rounds: the author's turn.")
-        return "", ""
     last = max((i for i, b in enumerate(bot) if b.startswith("VERDICT:")), default=0)
     review = "\n\n".join(bot[last:])
+    stuck = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
+    if stuck:
+        if "nightly-simplify" in {x["name"] for x in info["labels"]}:  # a fresh one from main is cheaper
+            gh("pr", "close", pr,"--comment", f"{STOP} ({stuck}): closed, the next nightly starts from main.")
+        elif not any(b.startswith(STOP) for b in bot):
+            gh("pr", "comment", pr, "--body", f"{STOP} ({stuck}): the author's turn.")
+        return "", ""
     gh("pr", "comment", pr, "--body", f"{ROUND} {rounds + 1}/{MAX_ROUNDS}.")
     return info["headRefName"], review
 
