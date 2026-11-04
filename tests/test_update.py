@@ -164,11 +164,13 @@ class Update(unittest.TestCase):
         self.p.ok("feedback", "new", "Slow accept", "--match", "accept", "--scope", "dpcli")
         self.p.ok("feedback", "new", "Plan sections", "--match", "plan", "--scope", "dpcli")
         self.p.ok("feedback", "new", "Closed one", "--match", "zzz", "--scope", "dpcli")
+        self.p.ok("feedback", "new", "Triaged out", "--match", "yyy", "--scope", "dpcli")
         led = self.p.root / ".dpcli-local" / "feedback.jsonl"
         with open(led, "a") as f:
             f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-1", "kind": "pr", "url": "https://github.com/o/r/pull/1"}) + "\n")
             f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-2", "kind": "pr", "url": "https://github.com/o/r/pull/2"}) + "\n")
             f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-3", "kind": "pr", "url": "https://github.com/o/r/pull/3"}) + "\n")
+            f.write(json.dumps({"t": "2026-10-01T00:00:00", "id": "F-4", "kind": "issue", "url": "https://github.com/o/r/issues/4"}) + "\n")
         bin_ = self.p.tmp / "bin"
         bin_.mkdir()
         gh = bin_ / "gh"
@@ -177,7 +179,9 @@ class Update(unittest.TestCase):
         states = {"1": {"state": "MERGED", "labels": [], "comments": []},
                   "2": {"state": "OPEN", "labels": [{"name": "rework"}],
                         "comments": [{"body": "VERDICT: rework\n- no test reproduces the friction", "url": "c2"}]},
-                  "3": {"state": "CLOSED", "labels": [{"name": "rejected"}], "comments": []}}
+                  "3": {"state": "CLOSED", "labels": [{"name": "rejected"}], "comments": []},
+                  "4": {"state": "CLOSED", "stateReason": "NOT_PLANNED", "labels": [],  # CI triage (implement.yml)
+                        "comments": [{"body": "Not a dpcli change (automatic triage; reopen to retry):\n\nbelongs in .dpcli-local"}]}}
         env = {**self.env, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_PR": json.dumps(states)}
         d = self.p.root / ".dpcli"
         git("branch", "improve/F-2-plan", cwd=d)
@@ -194,6 +198,7 @@ class Update(unittest.TestCase):
         listed = self.p.ok("feedback")
         self.assertRegex(listed, r"F-1 .*fixed")
         self.assertRegex(listed, r"F-2 .*rework")
+        self.assertIn("issues/4 rejected → F-4: belongs in .dpcli-local", out)  # not planned is not fixed
 
 
 if __name__ == "__main__":

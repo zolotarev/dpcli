@@ -82,7 +82,9 @@ def cmd_contribute(a):
         return home(dist, branch)
     if not a.new:
         dup = similar(repo, title)
-        if dup:
+        if dup and commits and "/issues/" in dup["url"]:  # a fix for a known issue: a PR, never a +1 (the fix would be lost)
+            body += f"\n{'Fixes' if dup['title'].lower() == title.lower() else 'Related:'} #{dup['number']}\n"  # same title: merge closes it
+        elif dup:
             r = run("gh", "issue", "comment", str(dup["number"]), "--repo", repo, "--body",
                     f"+1 from another project: ×{len(group)} in {ntasks} task(s).\n\n{FOOTER}")
             if r.returncode:

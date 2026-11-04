@@ -1,5 +1,8 @@
 # Changelog
 
+## 40
+- Issues no longer hang. A `feedback` issue from a trusted author becomes a PR by CI (`implement.yml`, on open plus a daily sweep) that goes through the review loop, or it is closed as not planned with the reason. Merging a PR closes the issues it fixes. `contribute` with a fix for an open issue of the same title opens a PR instead of a +1: `Fixes #N` for the same title, `Related: #N` for a merely similar one. The CI rework agent leaves `.github/workflows/` alone (the token may not push it), and a failed rework push says so on the PR. Only issues by the owner, members and collaborators are implemented; issues from other projects wait for a human. An issue where the agent neither commits nor explains is labelled `triaged` and not picked again. A stuck CI-made PR is closed.
+
 ## 39
 - CI rework loop: a PR that main's workflow changes block is not reworked, since the workflow token may not push such a merge. It goes to its author, and a nightly PR stuck this way or past 5 rounds is closed at once. The `push` and `again` jobs no longer stop when `review` failed in sync. The rework agent's comment never starts with `VERDICT:`. `decide.py` approves `test` runs held for approval (GitHub holds those started by the bot's own pushes and PRs) on every verdict, not only on accept.
 

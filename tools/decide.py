@@ -95,6 +95,11 @@ def main(pr):
                 label(pr, "rework", ["rejected"])
                 return print(f"#{pr}: merge failed")
             tag = release()
+            # closing keywords: GitHub may skip them for the workflow token's merge
+            for i in json.loads(gh("pr", "view", pr, "--json", "closingIssuesReferences", check=False) or "{}").get("closingIssuesReferences", []):
+                if gh("issue", "view", str(i["number"]), "--json", "state", "--jq", ".state", check=False).strip() != "OPEN":
+                    continue  # GitHub already closed it
+                gh("issue", "close", str(i["number"]), "--comment", f"Fixed by #{pr}" + (f", released in {tag}." if tag else "."), check=False)
             return print(f"#{pr}: merged" + (f", released {tag}" if tag else ""))
         gh("pr", "comment", pr, "--body", f"Review accepted, but the `test` workflow is {state}: fix and push again.")
     label(pr, "rework", ["rejected"])
@@ -114,8 +119,9 @@ def gate(pr):
     review = "\n\n".join(bot[last:])
     stuck = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
     if stuck:
-        if "nightly-simplify" in {x["name"] for x in info["labels"]}:  # a fresh one from main is cheaper
-            gh("pr", "close", pr,"--comment", f"{STOP} ({stuck}): closed, the next nightly starts from main.")
+        # CI-made PRs have no author to wait for: nightly starts afresh from main; an issue's stays open for a human
+        if "nightly-simplify" in {x["name"] for x in info["labels"]} or info["headRefName"].startswith("issue/"):
+            gh("pr", "close", pr, "--comment", f"{STOP} ({stuck}): closed, CI-made.")
         elif not any(b.startswith(STOP) for b in bot):
             gh("pr", "comment", pr, "--body", f"{STOP} ({stuck}): the author's turn.")
         return "", ""

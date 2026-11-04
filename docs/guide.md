@@ -96,7 +96,7 @@ After `init`, commit the result (only the main session commits).
 | `feedback new "title" --match REGEX --scope project\|dpcli [--why]` | create a cluster F-n (ledger `.dpcli-local/feedback.jsonl`) |
 | `feedback fix F-n --where … [--pr URL]` · `wontfix F-n --why …` · `reopen F-n` | close / reject / reopen |
 | `stats [module] [--since D] [--tokens]` | tasks, created→accepted, rework rounds, frictions; check durations (median/max s); `--tokens`: context tokens of executors, reviewers and coordinators and per task, from Claude Code's subagent logs |
-| `contribute F-n [--title T] [--new]` | dpcli-scope fix from `.dpcli` branch `improve/*` → PR to the hub (origin or fork), or +1 on a similar open one; no commits → issue; no `gh` → `build/dpcli/contribute-F-n/` with issue text and patches. After the PR `.dpcli` goes back to `main` (updates keep coming); again with commits on the PR's branch → pushed to the same PR |
+| `contribute F-n [--title T] [--new]` | dpcli-scope fix from `.dpcli` branch `improve/*` → PR to the hub (origin or fork), or +1 on a similar open one (with a fix for a similar issue — a PR with `Fixes #N`); no commits → issue, which the hub's CI implements as a PR or closes as not planned if its author is trusted (owner, member, collaborator), else it waits for a human; no `gh` → `build/dpcli/contribute-F-n/` with issue text and patches. After the PR `.dpcli` goes back to `main` (updates keep coming); again with commits on the PR's branch → pushed to the same PR |
 
 ## Updating automatically
 

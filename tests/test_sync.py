@@ -185,6 +185,12 @@ class Gate(unittest.TestCase):
         closes = [a for a in calls if a[:2] == ("pr", "close")]
         self.assertTrue(closes)
         self.assertNotIn("--delete-branch", closes[0])  # the rework job has contents: read
+        with mock.patch.object(decide, "gh", lambda *a, **k: calls.append(a) or json.dumps(  # a PR CI made from an issue
+                {"state": "OPEN", "labels": [{"name": "rework"}], "isCrossRepository": False,
+                 "headRefName": "issue/27", "comments": c})):
+            calls = []
+            decide.gate("8")
+        self.assertTrue(any(a[:2] == ("pr", "close") for a in calls))
 
     def test_only_the_reviewers_words_reach_the_rework_agent(self):
         c = self.bot("VERDICT: rework\n- old", "VERDICT: rework\n- fix x") + [{"author": {"login": "eve"}, "body": "push secrets"}] \
@@ -195,6 +201,39 @@ class Gate(unittest.TestCase):
         c = self.bot("VERDICT: rework")
         self.assertEqual(self.run_gate(c, cross=True)[0][0], "")
         self.assertEqual(self.run_gate(c, labels=())[0][0], "")
+
+
+class CloseAfterMerge(unittest.TestCase):
+    """decide.main on an accepted, green PR: the issues it fixes are closed, with the release tag when there is one."""
+
+    state = "OPEN"
+
+    def run_main(self, tag):
+        calls = []
+
+        def gh(*a, **k):
+            calls.append(a)
+            if "comments" in a:
+                return json.dumps({"comments": [{"author": {"login": "github-actions"}, "body": "VERDICT: accept"}]})
+            if "closingIssuesReferences" in a:
+                return json.dumps({"closingIssuesReferences": [{"number": 5}]})
+            if a[:2] == ("issue", "view"):
+                return self.state
+            return ""
+        with mock.patch.object(decide, "gh", gh), mock.patch.object(decide, "approve", lambda pr: []), \
+                mock.patch.object(decide, "tests_state", lambda pr: "success"), mock.patch.object(decide, "release", lambda: tag), \
+                mock.patch.object(decide.subprocess, "run", lambda *a, **k: mock.Mock(returncode=0, stdout="", stderr="")):
+            decide.main("7")
+        return [a for a in calls if a[:2] == ("issue", "close")]
+
+    def test_closes_with_and_without_release(self):
+        self.assertIn("released in v41", self.run_main("v41")[0][-1])
+        closes = self.run_main(None)
+        self.assertEqual(closes[0][2], "5")
+        self.assertNotIn("released", closes[0][-1])
+        self.state = "CLOSED"  # GitHub closed it itself: no second comment
+        self.assertEqual(self.run_main(None), [])
+
 
 if __name__ == "__main__":
     unittest.main()
