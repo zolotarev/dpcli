@@ -241,14 +241,17 @@ class Stuck(unittest.TestCase):
 
     def test_unreviewed_head_is_stuck_fresh_and_reviewed_are_not(self):
         bot = {"login": "github-actions"}
-        commit = lambda t: {"commits": [{"committedDate": t}]}
+        commit = lambda t, u=None: {"commits": [{"committedDate": t}], "updatedAt": u or t}
         prs = [{"number": 1, **commit("2026-11-05T16:09:00Z"),  # reworked, the re-review dispatch got HTTP 500
                 "comments": [{"author": bot, "body": "VERDICT: rework\n- x", "createdAt": "2026-11-05T16:01:00Z"}]},
                {"number": 2, **commit("2026-11-05T16:09:00Z"),  # reviewed after its last commit
                 "comments": [{"author": bot, "body": "VERDICT: rework", "createdAt": "2026-11-05T16:20:00Z"}]},
                {"number": 3, **commit("2026-11-05T17:30:00Z"), "comments": []},  # just pushed: its review may be running
                {"number": 4, **commit("2026-11-05T16:09:00Z"),  # a forged verdict by someone else does not count
-                "comments": [{"author": {"login": "eve"}, "body": "VERDICT: accept", "createdAt": "2026-11-05T16:30:00Z"}]}]
+                "comments": [{"author": {"login": "eve"}, "body": "VERDICT: accept", "createdAt": "2026-11-05T16:30:00Z"}]},
+               {"number": 5, **commit("2026-11-05T10:00:00Z", "2026-11-05T17:50:00Z"), "comments": []},  # old commit, just updated
+               {"number": 6, **commit("2026-11-03T10:00:00Z"), "comments": []},  # idle over a day: given up
+               {"number": 7, **commit("2026-11-05T16:09:00Z"), "comments": [], "isDraft": True}]
         now = dt.datetime(2026, 11, 5, 18, 0, tzinfo=dt.timezone.utc).timestamp()
         with mock.patch.object(decide, "gh", lambda *a, **k: json.dumps(prs)):
             self.assertEqual(decide.stuck(now), ["1", "4"])

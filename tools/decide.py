@@ -130,14 +130,17 @@ def gate(pr):
     return info["headRefName"], review
 
 
-def stuck(now=None, quiet=2700):
+def stuck(now=None, quiet=2700, give_up=86400):
     """Open PRs whose last commit has no reviewer verdict after it for `quiet` s: a lost dispatch (GitHub 500),
-    a failed job — the chain broke. -> their numbers, to be reviewed again (hourly, stuck.yml)."""
+    a failed job — the chain broke. Idle time counts from the later of the last commit and the PR's last update
+    (a rebase or late push is not idle); after `give_up` s idle the sweep stops. -> numbers, to be reviewed again."""
     now = now or time.time()
     out = []
-    for p in json.loads(gh("pr", "list", "--state", "open", "--json", "number,commits,comments")):
-        head = dt.datetime.fromisoformat(p["commits"][-1]["committedDate"].replace("Z", "+00:00")).timestamp()
-        if now - head < quiet:  # a review or rework may still be running
+    ts = lambda t: dt.datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
+    for p in json.loads(gh("pr", "list", "--state", "open", "--limit", "100", "--json",
+                           "number,commits,comments,updatedAt,isDraft")):
+        idle = now - max(ts(p["commits"][-1]["committedDate"]), ts(p.get("updatedAt") or "1970-01-01T00:00:00Z"))
+        if p.get("isDraft") or not quiet <= idle < give_up:  # draft; a review may be running; the sweep gave up
             continue
         if not any((c.get("author") or {}).get("login") in REVIEWERS and c["body"].startswith(("VERDICT:", STOP))
                    and c["createdAt"] > p["commits"][-1]["committedDate"] for c in p["comments"]):
