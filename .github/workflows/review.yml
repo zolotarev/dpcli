@@ -152,4 +152,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       # a push with the workflow token starts no workflows; dispatches do
-      - run: gh workflow run test.yml -R "$GITHUB_REPOSITORY" --ref "$B" -f ref="$B" && gh workflow run review.yml -R "$GITHUB_REPOSITORY" -f pr="$PR"
+      # retried: a lost dispatch (GitHub 500) left PRs waiting; stuck.yml catches whatever still slips
+      - run: |
+          for w in "test.yml --ref $B -f ref=$B" "review.yml -f pr=$PR"; do
+            for i in 1 2 3; do gh workflow run -R "$GITHUB_REPOSITORY" $w && break; sleep 20; done
+          done

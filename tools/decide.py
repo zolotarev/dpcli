@@ -2,6 +2,7 @@
 """After the AI review: wait for the `test` workflow, then act on the latest `VERDICT:` comment.
 accept + green → squash-merge, tag vN, release; rework (or red tests) → label `rework`; reject → label and close.
 Runs from the base branch only (trusted code)."""
+import datetime as dt
 import json
 import os
 import re
@@ -129,8 +130,25 @@ def gate(pr):
     return info["headRefName"], review
 
 
+def stuck(now=None, quiet=2700):
+    """Open PRs whose last commit has no reviewer verdict after it for `quiet` s: a lost dispatch (GitHub 500),
+    a failed job — the chain broke. -> their numbers, to be reviewed again (hourly, stuck.yml)."""
+    now = now or time.time()
+    out = []
+    for p in json.loads(gh("pr", "list", "--state", "open", "--json", "number,commits,comments")):
+        head = dt.datetime.fromisoformat(p["commits"][-1]["committedDate"].replace("Z", "+00:00")).timestamp()
+        if now - head < quiet:  # a review or rework may still be running
+            continue
+        if not any((c.get("author") or {}).get("login") in REVIEWERS and c["body"].startswith(("VERDICT:", STOP))
+                   and c["createdAt"] > p["commits"][-1]["committedDate"] for c in p["comments"]):
+            out.append(str(p["number"]))
+    return out
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT, the review to argv[3]
+    if sys.argv[1] == "--stuck":
+        print(" ".join(stuck()))
+    elif sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT, the review to argv[3]
         branch, review = gate(sys.argv[2])
         open(sys.argv[3], "w", encoding="utf-8").write(review)
         print(f"branch={branch}")

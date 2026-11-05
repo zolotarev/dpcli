@@ -1,0 +1,19 @@
+name: stuck
+# Safety net for the review loop: an open PR with no reviewer verdict since its last commit (a dispatch lost to a
+# GitHub 500, a failed job) is reviewed again. tools/decide.py --stuck.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+  actions: write
+jobs:
+  stuck:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: for pr in $(python3 tools/decide.py --stuck); do echo "#$pr"; gh workflow run review.yml -f pr="$pr"; done
