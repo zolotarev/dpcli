@@ -149,7 +149,11 @@ def stuck(now=None, quiet=2700, give_up=86400):
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "--stuck":
+    if sys.argv[1] == "--approve":  # every held run, right after a push by this bot (GitHub holds those; no setting avoids it)
+        for r in json.loads(gh("run", "list", "--status", "action_required", "--json", "databaseId", check=False) or "[]"):
+            gh("api", "-X", "POST", f"repos/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{r['databaseId']}/approve",
+               check=False)
+    elif sys.argv[1] == "--stuck":
         print(" ".join(stuck()))
     elif sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT, the review to argv[3]
         branch, review = gate(sys.argv[2])

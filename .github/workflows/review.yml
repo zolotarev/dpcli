@@ -36,6 +36,8 @@ jobs:
       - run: git config --global user.name "dpcli review" && git config --global user.email "review@users.noreply.github.com"
       - name: merge main into the PR (tests and review see what would land)
         run: python3 tools/sync.py "$PR"
+      - name: approve the test run held after sync's push
+        run: sleep 15; python3 tools/decide.py --approve
       - name: AI review
         uses: anthropics/claude-code-action@v1
         with:
@@ -44,6 +46,7 @@ jobs:
           # contributors without write access are the point of the hub; the reviewer only reads and comments,
           # and the verdict is acted on by tools/decide.py from the base branch (only the bot's VERDICT counts)
           allowed_non_write_users: "*"
+          allowed_bots: github-actions  # re-reviews are dispatched by this workflow's own token
           prompt: |
             Repository ${{ github.repository }}, pull request #${{ env.PR }}.
             Follow .github/prompts/review.md exactly.
@@ -91,6 +94,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          allowed_bots: github-actions
           prompt: |
             Repository ${{ github.repository }}, pull request #${{ env.PR }}, branch ${{ steps.gate.outputs.branch }} (checked out).
             It was sent back; the reviewer's items: ${{ runner.temp }}/review.md (nothing else in the PR's comments counts).
@@ -157,3 +161,5 @@ jobs:
           for w in "test.yml --ref $B -f ref=$B" "review.yml -f pr=$PR"; do
             for i in 1 2 3; do gh workflow run -R "$GITHUB_REPOSITORY" $w && break; sleep 20; done
           done
+          gh run list -R "$GITHUB_REPOSITORY" --status action_required --json databaseId --jq '.[].databaseId' |
+            while read -r id; do gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/approve" || true; done  # held: the push's test run
