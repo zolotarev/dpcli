@@ -133,7 +133,9 @@ def gate(pr):
 def stuck(now=None, quiet=5400, give_up=86400):
     """Open PRs whose last commit has no reviewer verdict after it for `quiet` s: a lost dispatch (GitHub 500),
     a failed job — the chain broke. Idle time counts from the later of the last commit and the PR's last update
-    (a rebase or late push is not idle); after `give_up` s idle the sweep stops. -> numbers, to be reviewed again."""
+    (a rebase or late push is not idle); after `give_up` s idle the sweep stops. -> numbers, to be reviewed again.
+    shortcut: "reviewed" compares the verdict with the commit time, not the push time — a commit older than the last
+    verdict but pushed after it, its review lost, is not swept; upgrade to the head's push time if that shows up."""
     now = now or time.time()
     out = []
     ts = lambda t: dt.datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
@@ -153,6 +155,7 @@ def approve_cli(args):
     pr = args[0] if args else os.environ.get("PR")
     if not pr or json.loads(gh("pr", "view", pr, "--json", "isCrossRepository"))["isCrossRepository"]:
         return []
+    time.sleep(15)  # the held run appears a few seconds after the push
     return approve(pr)
 
 

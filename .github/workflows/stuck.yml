@@ -17,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |  # each PR on its own: one failure does not skip the rest
-          for pr in $(python3 tools/decide.py --stuck); do
+          prs=$(python3 tools/decide.py --stuck)  # a failure here turns the sweep red
+          for pr in $prs; do
             echo "#$pr"; python3 tools/decide.py --approve "$pr" || true; gh workflow run review.yml -f pr="$pr" || echo "::warning::#$pr dispatch failed"
           done

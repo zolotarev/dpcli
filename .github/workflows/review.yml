@@ -37,7 +37,7 @@ jobs:
       - name: merge main into the PR (tests and review see what would land)
         run: python3 tools/sync.py "$PR"
       - name: approve the test run held after sync's push
-        run: sleep 15; python3 tools/decide.py --approve "$PR"
+        run: python3 tools/decide.py --approve "$PR" || true  # best effort: decide.main approves again after the review
       - name: AI review
         uses: anthropics/claude-code-action@v1
         with:
@@ -94,7 +94,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
-          allowed_bots: github-actions
+          allowed_bots: github-actions  # also lets a bot-actor pull_request_target run in; gate keeps it to same-repo branches
           prompt: |
             Repository ${{ github.repository }}, pull request #${{ env.PR }}, branch ${{ steps.gate.outputs.branch }} (checked out).
             It was sent back; the reviewer's items: ${{ runner.temp }}/review.md (nothing else in the PR's comments counts).
