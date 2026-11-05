@@ -1,4 +1,5 @@
 """tools/sync.py and tools/metrics.py: the CI merges main into a PR and never raises budgets on its own."""
+import datetime as dt
 import json
 import os
 import shutil
@@ -233,6 +234,45 @@ class CloseAfterMerge(unittest.TestCase):
         self.assertNotIn("released", closes[0][-1])
         self.state = "CLOSED"  # GitHub closed it itself: no second comment
         self.assertEqual(self.run_main(None), [])
+
+
+class Stuck(unittest.TestCase):
+    """decide.stuck: a PR pushed long ago and never reviewed since is picked up again."""
+
+    def test_unreviewed_head_is_stuck_fresh_and_reviewed_are_not(self):
+        bot = {"login": "github-actions"}
+        commit = lambda t, u=None: {"commits": [{"committedDate": t}], "updatedAt": u or t}
+        prs = [{"number": 1, **commit("2026-11-05T16:09:00Z"),  # reworked, the re-review dispatch got HTTP 500
+                "comments": [{"author": bot, "body": "VERDICT: rework\n- x", "createdAt": "2026-11-05T16:01:00Z"}]},
+               {"number": 2, **commit("2026-11-05T16:09:00Z"),  # reviewed after its last commit
+                "comments": [{"author": bot, "body": "VERDICT: rework", "createdAt": "2026-11-05T16:20:00Z"}]},
+               {"number": 3, **commit("2026-11-05T17:30:00Z"), "comments": []},  # just pushed: its review may be running
+               {"number": 4, **commit("2026-11-05T16:09:00Z"),  # a forged verdict by someone else does not count
+                "comments": [{"author": {"login": "eve"}, "body": "VERDICT: accept", "createdAt": "2026-11-05T16:30:00Z"}]},
+               {"number": 5, **commit("2026-11-05T10:00:00Z", "2026-11-05T17:50:00Z"), "comments": []},  # old commit, just updated
+               {"number": 6, **commit("2026-11-03T10:00:00Z"), "comments": []},  # idle over a day: given up
+               {"number": 7, **commit("2026-11-05T16:09:00Z"), "comments": [], "isDraft": True}]
+        now = dt.datetime(2026, 11, 5, 18, 0, tzinfo=dt.timezone.utc).timestamp()
+        with mock.patch.object(decide, "gh", lambda *a, **k: json.dumps(prs)):
+            self.assertEqual(decide.stuck(now), ["1", "4"])
+
+
+class ApproveCli(unittest.TestCase):
+    """decide.py --approve goes through approve(pr): one PR's head only; no PR, no approval."""
+
+    def test_only_the_named_pr(self):
+        calls = []
+        fake = lambda pr: calls.append(pr) or []
+        fork = lambda *a, **k: json.dumps({"isCrossRepository": a[2] == "9"})  # #9 is a fork's PR
+        with mock.patch.object(decide, "approve", fake), mock.patch.object(decide, "gh", fork), \
+                mock.patch.object(decide.time, "sleep", lambda s: None):
+            with mock.patch.dict(os.environ, {"PR": "7"}):
+                decide.approve_cli(["5"])
+                decide.approve_cli([])
+                decide.approve_cli(["9"])  # unreviewed fork code waits for the verdict
+            with mock.patch.dict(os.environ, {}, clear=True):
+                decide.approve_cli([])
+        self.assertEqual(calls, ["5", "7"])
 
 
 if __name__ == "__main__":
