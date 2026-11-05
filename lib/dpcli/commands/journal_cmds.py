@@ -27,8 +27,8 @@ def cmd_decide(a):
         if a.ask:
             raise DpError("--plan is for decisions, not --ask")
         line = f"- **{a.text}** ({d['t'][:10]})" + (f" — {a.why}" if a.why else "")
-        _, title, _ = plan_edit(a.module, a.plan, append=line, create=a.plan == DEFAULT_SECTION)
-        plan_note = f"; to plan: {short(title, 40)}"
+        _, title, what = plan_edit(a.module, a.plan, append=line, create=a.plan == DEFAULT_SECTION, skip_if=a.text)
+        plan_note = f"; plan {short(title, 40)}: " + ("line already there, not duplicated" if what is None else "added")
     if a.why:
         d["why"] = a.why
     if a.task:
