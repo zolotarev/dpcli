@@ -36,6 +36,8 @@ jobs:
       - run: git config --global user.name "dpcli review" && git config --global user.email "review@users.noreply.github.com"
       - name: merge main into the PR (tests and review see what would land)
         run: python3 tools/sync.py "$PR"
+      - name: approve the test run held after sync's push
+        run: python3 tools/decide.py --approve "$PR" || true  # best effort: decide.main approves again after the review
       - name: AI review
         uses: anthropics/claude-code-action@v1
         with:
@@ -44,6 +46,7 @@ jobs:
           # contributors without write access are the point of the hub; the reviewer only reads and comments,
           # and the verdict is acted on by tools/decide.py from the base branch (only the bot's VERDICT counts)
           allowed_non_write_users: "*"
+          allowed_bots: github-actions  # re-reviews are dispatched by this workflow's own token
           prompt: |
             Repository ${{ github.repository }}, pull request #${{ env.PR }}.
             Follow .github/prompts/review.md exactly.
@@ -91,6 +94,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          allowed_bots: github-actions  # also lets a bot-actor pull_request_target run in; gate keeps it to same-repo branches
           prompt: |
             Repository ${{ github.repository }}, pull request #${{ env.PR }}, branch ${{ steps.gate.outputs.branch }} (checked out).
             It was sent back; the reviewer's items: ${{ runner.temp }}/review.md (nothing else in the PR's comments counts).
@@ -146,10 +150,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      contents: read
+      pull-requests: read
     env:
       B: ${{ needs.rework.outputs.branch }}
       PR: ${{ github.event.pull_request.number || inputs.pr }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v4
       # a push with the workflow token starts no workflows; dispatches do
-      - run: gh workflow run test.yml -R "$GITHUB_REPOSITORY" --ref "$B" -f ref="$B" && gh workflow run review.yml -R "$GITHUB_REPOSITORY" -f pr="$PR"
+      # retried: a lost dispatch (GitHub 500) left PRs waiting; stuck.yml catches whatever still slips
+      - run: |
+          for w in "test.yml --ref $B -f ref=$B" "review.yml -f pr=$PR"; do
+            for i in 1 2 3 0; do  # 0: all three failed — the job goes red, stuck.yml picks the PR up later
+              [ $i = 0 ] && exit 1; gh workflow run -R "$GITHUB_REPOSITORY" $w && break; [ $i = 3 ] || sleep 20
+            done
+          done
+          python3 tools/decide.py --approve "$PR"  # the push's test run, held by GitHub

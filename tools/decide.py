@@ -2,6 +2,7 @@
 """After the AI review: wait for the `test` workflow, then act on the latest `VERDICT:` comment.
 accept + green → squash-merge, tag vN, release; rework (or red tests) → label `rework`; reject → label and close.
 Runs from the base branch only (trusted code)."""
+import datetime as dt
 import json
 import os
 import re
@@ -117,20 +118,53 @@ def gate(pr):
     rounds = sum(b.startswith(ROUND) for b in bot)  # own marks: any way into `rework` (red tests, failed merge) counts
     last = max((i for i, b in enumerate(bot) if b.startswith("VERDICT:")), default=0)
     review = "\n\n".join(bot[last:])
-    stuck = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
-    if stuck:
+    why = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
+    if why:
         # CI-made PRs have no author to wait for: nightly starts afresh from main; an issue's stays open for a human
         if "nightly-simplify" in {x["name"] for x in info["labels"]} or info["headRefName"].startswith("issue/"):
-            gh("pr", "close", pr, "--comment", f"{STOP} ({stuck}): closed, CI-made.")
+            gh("pr", "close", pr, "--comment", f"{STOP} ({why}): closed, CI-made.")
         elif not any(b.startswith(STOP) for b in bot):
-            gh("pr", "comment", pr, "--body", f"{STOP} ({stuck}): the author's turn.")
+            gh("pr", "comment", pr, "--body", f"{STOP} ({why}): the author's turn.")
         return "", ""
     gh("pr", "comment", pr, "--body", f"{ROUND} {rounds + 1}/{MAX_ROUNDS}.")
     return info["headRefName"], review
 
 
+def stuck(now=None, quiet=5400, give_up=86400):
+    """Open PRs whose last commit has no reviewer verdict after it for `quiet` s: a lost dispatch (GitHub 500),
+    a failed job — the chain broke. Idle time counts from the later of the last commit and the PR's last update
+    (a rebase or late push is not idle); after `give_up` s idle the sweep stops. -> numbers, to be reviewed again.
+    shortcut: "reviewed" compares the verdict with the commit time, not the push time — a commit older than the last
+    verdict but pushed after it, its review lost, is not swept; upgrade to the head's push time if that shows up."""
+    now = now or time.time()
+    out = []
+    ts = lambda t: dt.datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
+    for p in json.loads(gh("pr", "list", "--state", "open", "--limit", "100", "--json",
+                           "number,commits,comments,updatedAt,isDraft")):
+        idle = now - max(ts(p["commits"][-1]["committedDate"]), ts(p.get("updatedAt") or "1970-01-01T00:00:00Z"))
+        if p.get("isDraft") or not quiet <= idle < give_up:  # draft; a review may be running; the sweep gave up
+            continue
+        if not any((c.get("author") or {}).get("login") in REVIEWERS and c["body"].startswith(("VERDICT:", STOP))
+                   and c["createdAt"] > p["commits"][-1]["committedDate"] for c in p["comments"]):
+            out.append(str(p["number"]))
+    return out
+
+
+def approve_cli(args):
+    """Before the review: only same-repo branches (this bot's pushes); a fork's runs wait for the verdict (decide.main)."""
+    pr = args[0] if args else os.environ.get("PR")
+    if not pr or json.loads(gh("pr", "view", pr, "--json", "isCrossRepository"))["isCrossRepository"]:
+        return []
+    time.sleep(15)  # the held run appears a few seconds after the push
+    return approve(pr)
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT, the review to argv[3]
+    if sys.argv[1] == "--approve":  # test.yml on one PR's head (argv[2] or $PR), as approve(); no PR, nothing
+        approve_cli(sys.argv[2:])
+    elif sys.argv[1] == "--stuck":
+        print(" ".join(stuck()))
+    elif sys.argv[1] == "--gate":  # prints branch=<name> for $GITHUB_OUTPUT, the review to argv[3]
         branch, review = gate(sys.argv[2])
         open(sys.argv[3], "w", encoding="utf-8").write(review)
         print(f"branch={branch}")
