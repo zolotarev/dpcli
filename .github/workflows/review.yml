@@ -162,6 +162,8 @@ jobs:
       # retried: a lost dispatch (GitHub 500) left PRs waiting; stuck.yml catches whatever still slips
       - run: |
           for w in "test.yml --ref $B -f ref=$B" "review.yml -f pr=$PR"; do
-            for i in 1 2 3; do gh workflow run -R "$GITHUB_REPOSITORY" $w && break; sleep 20; done
+            for i in 1 2 3 0; do  # 0: all three failed — the job goes red, stuck.yml picks the PR up later
+              [ $i = 0 ] && exit 1; gh workflow run -R "$GITHUB_REPOSITORY" $w && break; [ $i = 3 ] || sleep 20
+            done
           done
           python3 tools/decide.py --approve "$PR"  # the push's test run, held by GitHub

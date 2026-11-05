@@ -16,4 +16,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - run: for pr in $(python3 tools/decide.py --stuck); do echo "#$pr"; python3 tools/decide.py --approve "$pr"; gh workflow run review.yml -f pr="$pr"; done
+      - run: |  # each PR on its own: one failure does not skip the rest
+          for pr in $(python3 tools/decide.py --stuck); do
+            echo "#$pr"; python3 tools/decide.py --approve "$pr" || true; gh workflow run review.yml -f pr="$pr" || echo "::warning::#$pr dispatch failed"
+          done
