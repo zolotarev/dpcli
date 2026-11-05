@@ -16,5 +16,4 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tools/decide.py --approve  # anything GitHub still holds for a human
-      - run: for pr in $(python3 tools/decide.py --stuck); do echo "#$pr"; gh workflow run review.yml -f pr="$pr"; done
+      - run: for pr in $(python3 tools/decide.py --stuck); do echo "#$pr"; python3 tools/decide.py --approve "$pr"; gh workflow run review.yml -f pr="$pr"; done

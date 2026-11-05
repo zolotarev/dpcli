@@ -37,7 +37,7 @@ jobs:
       - name: merge main into the PR (tests and review see what would land)
         run: python3 tools/sync.py "$PR"
       - name: approve the test run held after sync's push
-        run: sleep 15; python3 tools/decide.py --approve
+        run: sleep 15; python3 tools/decide.py --approve "$PR"
       - name: AI review
         uses: anthropics/claude-code-action@v1
         with:
@@ -150,16 +150,18 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      contents: read
+      pull-requests: read
     env:
       B: ${{ needs.rework.outputs.branch }}
       PR: ${{ github.event.pull_request.number || inputs.pr }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v4
       # a push with the workflow token starts no workflows; dispatches do
       # retried: a lost dispatch (GitHub 500) left PRs waiting; stuck.yml catches whatever still slips
       - run: |
           for w in "test.yml --ref $B -f ref=$B" "review.yml -f pr=$PR"; do
             for i in 1 2 3; do gh workflow run -R "$GITHUB_REPOSITORY" $w && break; sleep 20; done
           done
-          gh run list -R "$GITHUB_REPOSITORY" --status action_required --json databaseId --jq '.[].databaseId' |
-            while read -r id; do gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/approve" || true; done  # held: the push's test run
+          python3 tools/decide.py --approve "$PR"  # the push's test run, held by GitHub
