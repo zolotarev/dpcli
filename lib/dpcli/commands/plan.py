@@ -50,7 +50,7 @@ def cmd_plan(a):
 
 
 def plan_edit(target, section, contracts=False, append=None, replace=None, set_=None, create=False, all_=False, skip_if=None):
-    """Edit a section body (section "*" = whole file, --replace only). -> (path, heading, what was done)."""
+    """Edit a section body (section "*" = whole file, --replace only). -> (path, heading, what was done; None if skipped by skip_if)."""
     path = plan_path(target, contracts)
     if not path.exists():
         raise DpError(f"no file {rel(path)}")

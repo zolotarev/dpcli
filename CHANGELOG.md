@@ -1,7 +1,7 @@
 # Changelog
 
 ## 43
-- `decide --plan` skips the plan line when the section already has a line with the same decision text (e.g. written by hand), and says so.
+- `decide --plan` skips the plan line when the section already has a line with the same decision text (e.g. written by hand), and says so. Only the exact `- **text**` form at line start is matched.
 
 ## 42
 - When main changes `.github/workflows`, open PRs no longer stall waiting for their authors. With an owner-made `DPCLI_PUSH_TOKEN` secret (`workflows` scope), `tools/sync.py` pushes the merge of main itself. Without it, the PR goes back to its author as before.
