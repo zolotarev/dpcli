@@ -49,7 +49,7 @@ def cmd_plan(a):
     print("\n".join(section_body(lines, heads, sel, a.max)))
 
 
-def plan_edit(target, section, contracts=False, append=None, replace=None, set_=None, create=False, all_=False):
+def plan_edit(target, section, contracts=False, append=None, replace=None, set_=None, create=False, all_=False, skip_if=None):
     """Edit a section body (section "*" = whole file, --replace only). -> (path, heading, what was done)."""
     path = plan_path(target, contracts)
     if not path.exists():
@@ -79,6 +79,8 @@ def plan_edit(target, section, contracts=False, append=None, replace=None, set_=
     be = end
     while be > i + 1 and not lines[be - 1].strip():
         be -= 1
+    if append is not None and skip_if and any(skip_if in x for x in lines[i + 1:end]):
+        return path, title, "already there"
     if append is not None:
         new = append.rstrip("\n").splitlines()
         lines[be:be] = ([""] if be == i + 1 else []) + new

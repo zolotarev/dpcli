@@ -1,7 +1,7 @@
 # Changelog
 
 ## 41
-- Workflow: the plan's user-decisions section is filled only by `decide --plan`. A hand-written plan line plus `decide --plan` gave the same decision twice.
+- `decide --plan` skips the plan line when the section already has a line with the same decision text (e.g. written by hand), and says so.
 
 ## 40
 - Issues no longer hang. A `feedback` issue from a trusted author becomes a PR by CI (`implement.yml`, on open plus a daily sweep) that goes through the review loop, or it is closed as not planned with the reason. Merging a PR closes the issues it fixes. `contribute` with a fix for an open issue of the same title opens a PR instead of a +1: `Fixes #N` for the same title, `Related: #N` for a merely similar one. The CI rework agent leaves `.github/workflows/` alone (the token may not push it), and a failed rework push says so on the PR. Only issues by the owner, members and collaborators are implemented; issues from other projects wait for a human. An issue where the agent neither commits nor explains is labelled `triaged` and not picked again. A stuck CI-made PR is closed.

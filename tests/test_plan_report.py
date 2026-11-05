@@ -39,6 +39,13 @@ class PlanSections(unittest.TestCase):
         self.p.ok("plan", "edit", "pf", "1. Goal", "--append", "Fast.")
         self.assertIn("Fast.", self.p.ok("plan", "pf", "1"))
 
+    def test_decide_plan_skips_line_written_by_hand(self):
+        self.p.ok("plan", "edit", "pf", "1. Goal", "--append", "- **Use B** (2026-01-01)")
+        out = self.p.ok("decide", "pf", "Use B", "--by", "user", "--plan", "1. Goal")
+        self.assertIn("already there", out)
+        self.assertEqual(self.p.ok("plan", "pf", "1").count("Use B"), 1)
+        self.assertIn("added", self.p.ok("decide", "pf", "Use C", "--by", "user", "--plan", "1. Goal"))
+
     def test_plan_ref_checked_at_task_new(self):
         args = ["task", "new", "pf", "--type", "dp-engineer", "--title", "t", "--goal", "g", "--scope", "src", "--no-copy"]
         for bad in ("7. Nowhere", "7. Nowhere (x)", "Goal (1)"):
