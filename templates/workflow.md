@@ -6,13 +6,13 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 
 ## Roles
 - **User** — decisions, forks, acceptance of the result.
-- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan` (`--why` is the reason; no reason — leave it empty, `decisions.md` will say "approved by the developer"), gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
+- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan` (`--why` — the reason, if any), gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
 - **Module coordinator** (`dp-coordinator`) — contracts, task cards, launching executors, acceptance, gates. Does not write or review code.
 - **Executor** (`dpcli_role: executor`) — one task in its own copy and branch, within the card's bounds.
 - **Reviewer** (`dp-reviewer`) — fresh, empty context, one task; only reads and re-runs checks.
 
 ## Lifecycle
-1. Plan `{{plan_dir}}/<m>.md`: goal, user decisions, tasks with scope and acceptance, waves, stop conditions.
+1. Plan `{{plan_dir}}/<m>.md`: goal, user decisions (only via `decide --plan`, never by hand), tasks with scope and acceptance, waves, stop conditions.
 2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor. Several modules of one feature — each its own branch from the same feature branch.
 3. Waves: ≤ 4 executors at once; task → card → copy and branch `<m>/<ID>` from `{{module_branch}}` → acceptance (see "Acceptance").
 4. Gate (stop condition or a fork outside the plan): `{{cli}} decide <m> "question" --ask` → main session asks the user → `answer`.
