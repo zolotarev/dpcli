@@ -35,6 +35,10 @@ jobs:
           fetch-depth: 0
       - run: git config --global user.name "dpcli review" && git config --global user.email "review@users.noreply.github.com"
       - name: merge main into the PR (tests and review see what would land)
+        env:
+          # optional, owner-made: a token with `workflows` scope, used only to push main's workflow changes into a PR
+          # branch (the workflow token may not); never given to the rework job, whose push carries agent-written code
+          PUSH_TOKEN: ${{ secrets.DPCLI_PUSH_TOKEN }}
         run: python3 tools/sync.py "$PR"
       - name: approve the test run held after sync's push
         run: python3 tools/decide.py --approve "$PR" || true  # best effort: decide.main approves again after the review

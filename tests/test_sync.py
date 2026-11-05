@@ -122,6 +122,13 @@ class Sync(unittest.TestCase):
         self.main_moves({".github/workflows/t.yml": "on: push\n"})
         self.assertIn("not a conflict", self.sync())
 
+    def test_main_changed_workflows_merged_with_a_push_token(self):
+        self.pr({"lib/a.py": "x = 2\n"})
+        self.main_moves({".github/workflows/t.yml": "on: push\n"})
+        with mock.patch.dict(os.environ, {"PUSH_TOKEN": "t"}):
+            self.sync()
+        self.assertEqual(self.pushed(".github/workflows/t.yml"), "on: push\n")  # main merged in, not blocked
+
     def test_author_push_during_sync_is_left_alone(self):
         self.pr({"lib/a.py": "x = 2\n"})
         self.main_moves({"lib/b.py": "y = 1\n"})
