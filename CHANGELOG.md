@@ -1,7 +1,10 @@
 # Changelog
 
-## 42
+## 43
 - `decide --plan` skips the plan line when the section already has a line with the same decision text (e.g. written by hand), and says so.
+
+## 42
+- When main changes `.github/workflows`, open PRs no longer stall waiting for their authors. With an owner-made `DPCLI_PUSH_TOKEN` secret (`workflows` scope), `tools/sync.py` pushes the merge of main itself. Without it, the PR goes back to its author as before.
 
 ## 41
 - Review loop no longer hangs on a lost dispatch. A GitHub 500 on the re-review dispatch had left a reworked PR waiting. `again` retries its dispatches, and an hourly `stuck.yml` reviews again any open PR with no reviewer verdict since its last commit (`tools/decide.py --stuck`). Re-reviews dispatched by the bot actually run: `claude-code-action` refused a non-human actor until `allowed_bots: github-actions` was set. `decide.py --approve [PR]` approves the held `test.yml` run of one PR's head only (the same `approve(pr)` the gate uses); without a PR it does nothing.

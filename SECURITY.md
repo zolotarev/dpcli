@@ -9,6 +9,7 @@ dpcli is installed into projects as a git submodule and updates itself on sessio
 - tests run on `pull_request` without secrets, so PRs from forks cannot read them;
 - changes to `.github/workflows/` cannot be merged by the CI token and always need a maintainer;
 - the AI review runs for every author, including those without write access (`allowed_non_write_users`); it can only read the PR and comment, and only the reviewer bot's own `VERDICT:` comment is acted on;
+- the optional `DPCLI_PUSH_TOKEN` secret (`workflows` scope) is used only by `tools/sync.py` to push main's own changes into a PR branch; agent-written commits are never pushed with it;
 - a project can freeze its version: `dpcli update --pin vN`; a bad release is reverted by a regular revert PR.
 
 ## Reporting a vulnerability
