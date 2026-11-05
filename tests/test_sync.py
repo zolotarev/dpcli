@@ -257,5 +257,20 @@ class Stuck(unittest.TestCase):
             self.assertEqual(decide.stuck(now), ["1", "4"])
 
 
+class ApproveCli(unittest.TestCase):
+    """decide.py --approve goes through approve(pr): one PR's head only; no PR, no approval."""
+
+    def test_only_the_named_pr(self):
+        calls = []
+        fake = lambda pr: calls.append(pr) or []
+        with mock.patch.object(decide, "approve", fake):
+            with mock.patch.dict(os.environ, {"PR": "7"}):
+                decide.approve_cli(["5"])
+                decide.approve_cli([])
+            with mock.patch.dict(os.environ, {}, clear=True):
+                decide.approve_cli([])
+        self.assertEqual(calls, ["5", "7"])
+
+
 if __name__ == "__main__":
     unittest.main()
