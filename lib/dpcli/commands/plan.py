@@ -79,8 +79,8 @@ def plan_edit(target, section, contracts=False, append=None, replace=None, set_=
     be = end
     while be > i + 1 and not lines[be - 1].strip():
         be -= 1
-    if append is not None and skip_if and any(skip_if in x for x in lines[i + 1:end]):
-        return path, title, "already there"
+    if append is not None and skip_if and any(x.startswith(f"- **{skip_if}**") for x in lines[i + 1:end]):
+        return path, title, None  # skipped: the decision line is already there
     if append is not None:
         new = append.rstrip("\n").splitlines()
         lines[be:be] = ([""] if be == i + 1 else []) + new
