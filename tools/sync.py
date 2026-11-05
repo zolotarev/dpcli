@@ -2,10 +2,11 @@
 """Before the AI review: merge current main into the PR, so tests and review see what would land.
 Parallel PRs always collide on VERSION and the top of CHANGELOG.md: only those hunks are resolved here (the PR's
 VERSION and its own CHANGELOG section become main's VERSION + 1); everything else in the merged files is kept.
-Any other conflict, a fork branch or a merge the token cannot push → comment + `rework`, exit 1 (review skipped).
+Any other conflict, a fork branch or a merge the token cannot push (workflow files, without DPCLI_PUSH_TOKEN) → comment + `rework`, exit 1 (review skipped).
 Runs from the base branch only: the merge happens in a separate worktree, nothing from the PR is executed.
 shortcut: main moving during the review is not re-synced (decide.py's merge fails → `rework`, the next push
 re-syncs); upgrade to a resync on push to main if that happens often."""
+import base64
 import json
 import os
 import re
@@ -81,9 +82,14 @@ def main(pr):
         if conflicts:
             block(pr, f"conflicts with main in {', '.join(sorted(conflicts))}; merge main into the fork branch and push")
         return print(f"#{pr}: fork, merges cleanly with main; reviewed as is")
+    auth = []  # the workflow token may not push a merge that brings workflow files; DPCLI_PUSH_TOKEN (workflows scope) may
     if git("diff", "--name-only", f"{head}...origin/main", "--", ".github/workflows").stdout.strip():
-        block(pr, f"{WORKFLOWS} since this branch, and the CI token may not push workflow files; "
-                  "merge main into the branch and push (not a conflict)")
+        tok = os.environ.get("PUSH_TOKEN")
+        if not tok:
+            block(pr, f"{WORKFLOWS} since this branch, and the CI token may not push workflow files; "
+                      "merge main into the branch and push (not a conflict), or give CI a DPCLI_PUSH_TOKEN secret")
+        h = "http.https://github.com/.extraheader"  # empty first: drop checkout's header, send only this one
+        auth = ["-c", f"{h}=", "-c", f"{h}=AUTHORIZATION: basic " + base64.b64encode(f"x-access-token:{tok}".encode()).decode()]
     show = lambda ref, f: git("show", f"{ref}:{f}", check=False).stdout
     try:
         own, n = version(show(head, INIT)), version(show("origin/main", INIT)) + 1
@@ -104,7 +110,7 @@ def main(pr):
     git("add", "-A", cwd=wt)
     git("commit", "-q", "--no-edit", cwd=wt)
     b = info["headRefName"]
-    r = git("push", "-q", f"--force-with-lease=refs/heads/{b}:{sha}", "origin", f"HEAD:refs/heads/{b}", cwd=wt, check=False)
+    r = git(*auth, "push", "-q", f"--force-with-lease=refs/heads/{b}:{sha}", "origin", f"HEAD:refs/heads/{b}", cwd=wt, check=False)
     if r.returncode:  # the author pushed meanwhile: that push starts a new review, which cancels this one
         sys.exit(f"#{pr}: push rejected ({r.stderr.strip()[-200:]}); the branch moved, its new review takes over")
     # a push with the workflow token starts no workflows: run the tests on the new head for decide.py
