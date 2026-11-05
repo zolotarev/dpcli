@@ -8,7 +8,7 @@ description: "Review the {{project}} process (harness) — cluster frictions wit
 Cheap: one session, no subagents, only the commands below. Don't read project code.
 
 1. **State.** `{{cli}} update --prs-only`, `{{cli}} feedback` — clusters F-n (open / fixed, `⚠N after fix` = the fix did not work) and unclustered frictions by topic. `{{cli}} stats` — rework rounds, created→accepted, slow checks. `python3 .claude/skills/harness-retro/cost.py --since <YYYY-MM-DD>` — tokens: alarming if the main session's average context > 200k or Opus runs outside the models table.
-2. **Cluster.** For a recurring topic (≥ 2) read `{{cli}} feedback show <topic>`, then `{{cli}} feedback new "<anonymized title>" --match "<regex>" --scope project|dpcli --why "<one line>"`. Scope `project` — specific to this codebase or team (fixed in `.dpcli-local/`); `dpcli` — would hurt any project (fixed in dpcli itself). Titles never contain project names, paths or quotes.
+2. **Cluster.** For a recurring topic (≥ 2) read `{{cli}} feedback show <topic>`, then `{{cli}} feedback new "<anonymized title>" --match "<regex>" --scope project|dpcli --why "<one line>"`. Scope `project` — specific to this codebase or team (fixed in `.dpcli-local/`); `dpcli` — would hurt any project (fixed in dpcli itself). Titles and `--why` in English (dpcli ones reach the public hub), never with project names, paths or quotes.
 3. **Pick** ≤ 3, most frequent/expensive first: `F-n ×count [scope] → change (file) → gain/cost`.
 4. **Apply.**
    - project: edit `.dpcli-local/` (`workflow.md`, `claude-md.md`, `agents/<name>.append.md`, `skills/`), `{{cli}} init`, commit `.dpcli-local/ .claude/ CLAUDE.md`, then `{{cli}} feedback fix F-n --where .dpcli-local/<file>`;
