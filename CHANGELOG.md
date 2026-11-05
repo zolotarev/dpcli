@@ -1,5 +1,8 @@
 # Changelog
 
+## 44
+- `harness-retro` writes friction titles and `--why` in English, because `contribute` sends them to the public hub as PR titles and bodies (a PR arrived in Russian). The CI rework agent may fix a PR's title and body (`gh pr edit`). The `code_lines` and `prompt_tokens` budgets are re-based to main's measured values (6024 and 7035). Main had drifted to the edge of the 2% tolerance, so every PR crossed it and rework argued over the budget.
+
 ## 42
 - When main changes `.github/workflows`, open PRs no longer stall waiting for their authors. With an owner-made `DPCLI_PUSH_TOKEN` secret (`workflows` scope), `tools/sync.py` pushes the merge of main itself. Without it, the PR goes back to its author as before.
 
