@@ -130,7 +130,7 @@ def gate(pr):
     return info["headRefName"], review
 
 
-def stuck(now=None, quiet=2700, give_up=86400):
+def stuck(now=None, quiet=5400, give_up=86400):
     """Open PRs whose last commit has no reviewer verdict after it for `quiet` s: a lost dispatch (GitHub 500),
     a failed job — the chain broke. Idle time counts from the later of the last commit and the PR's last update
     (a rebase or late push is not idle); after `give_up` s idle the sweep stops. -> numbers, to be reviewed again."""
