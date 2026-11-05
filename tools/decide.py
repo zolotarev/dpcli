@@ -118,13 +118,13 @@ def gate(pr):
     rounds = sum(b.startswith(ROUND) for b in bot)  # own marks: any way into `rework` (red tests, failed merge) counts
     last = max((i for i, b in enumerate(bot) if b.startswith("VERDICT:")), default=0)
     review = "\n\n".join(bot[last:])
-    stuck = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
-    if stuck:
+    why = f"after {MAX_ROUNDS} rounds" if rounds >= MAX_ROUNDS else "CI may not push workflow files" if WORKFLOWS in review else ""
+    if why:
         # CI-made PRs have no author to wait for: nightly starts afresh from main; an issue's stays open for a human
         if "nightly-simplify" in {x["name"] for x in info["labels"]} or info["headRefName"].startswith("issue/"):
-            gh("pr", "close", pr, "--comment", f"{STOP} ({stuck}): closed, CI-made.")
+            gh("pr", "close", pr, "--comment", f"{STOP} ({why}): closed, CI-made.")
         elif not any(b.startswith(STOP) for b in bot):
-            gh("pr", "comment", pr, "--body", f"{STOP} ({stuck}): the author's turn.")
+            gh("pr", "comment", pr, "--body", f"{STOP} ({why}): the author's turn.")
         return "", ""
     gh("pr", "comment", pr, "--body", f"{ROUND} {rounds + 1}/{MAX_ROUNDS}.")
     return info["headRefName"], review
@@ -149,8 +149,11 @@ def stuck(now=None, quiet=5400, give_up=86400):
 
 
 def approve_cli(args):
+    """Before the review: only same-repo branches (this bot's pushes); a fork's runs wait for the verdict (decide.main)."""
     pr = args[0] if args else os.environ.get("PR")
-    return approve(pr) if pr else []
+    if not pr or json.loads(gh("pr", "view", pr, "--json", "isCrossRepository"))["isCrossRepository"]:
+        return []
+    return approve(pr)
 
 
 if __name__ == "__main__":

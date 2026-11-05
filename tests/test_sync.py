@@ -263,10 +263,12 @@ class ApproveCli(unittest.TestCase):
     def test_only_the_named_pr(self):
         calls = []
         fake = lambda pr: calls.append(pr) or []
-        with mock.patch.object(decide, "approve", fake):
+        fork = lambda *a, **k: json.dumps({"isCrossRepository": a[2] == "9"})  # #9 is a fork's PR
+        with mock.patch.object(decide, "approve", fake), mock.patch.object(decide, "gh", fork):
             with mock.patch.dict(os.environ, {"PR": "7"}):
                 decide.approve_cli(["5"])
                 decide.approve_cli([])
+                decide.approve_cli(["9"])  # unreviewed fork code waits for the verdict
             with mock.patch.dict(os.environ, {}, clear=True):
                 decide.approve_cli([])
         self.assertEqual(calls, ["5", "7"])
