@@ -1,5 +1,8 @@
 # Changelog
 
+## 46
+- `accept` scope check matches a scope path literally before treating `[` `*` `?` as glob: router directories like `[slug]` are names, and the check reported files under them as outside scope (4 reports).
+
 ## 45
 - `decide --plan` skips the plan line when the section already has a line with the same decision text (e.g. written by hand), and says so. Only the exact `- **text**` form at line start is matched.
 

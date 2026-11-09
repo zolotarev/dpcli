@@ -166,10 +166,10 @@ def _pat(entry):
 
 
 def _hit(path, pat):
-    if any(ch in pat for ch in "*?["):
-        return fnmatch.fnmatch(path, pat) or fnmatch.fnmatch(path, pat.replace("**/", ""))
     p = pat.rstrip("/").removeprefix("./")
-    return path == p or path.startswith(p + "/")
+    if path == p or path.startswith(p + "/"):  # literal first: router directories like [slug] are names
+        return True
+    return any(ch in pat for ch in "*?[") and (fnmatch.fnmatch(path, pat) or fnmatch.fnmatch(path, pat.replace("**/", "")))
 
 
 def path_in(path, pats):
