@@ -58,6 +58,13 @@ class ScopePaths(RepoCase):
         self.assertTrue(accept.path_in(self.NAME, accept._pat(f"`{self.NAME}` (раздел)")))
         self.assertFalse(accept.path_in("src/y.py", accept._pat("src/x.py — функция f")))
 
+    def test_brackets_are_literal_names(self):
+        # router directories like [slug] are names, not glob classes
+        self.assertTrue(accept.path_in("app/[slug]/(group)/page.tsx", ["app/[slug]/(group)/"]))
+        self.assertTrue(accept.path_in("app/[slug]/page.tsx", ["app/[slug]/page.tsx"]))
+        self.assertTrue(accept.path_in("app/s/page.tsx", ["app/[st]/page.tsx"]))  # still a glob when nothing literal matches
+        self.assertFalse(accept.path_in("app/[slug]/x.tsx", ["app/[slug]/page.tsx"]))
+
     def test_changed_files_unquoted(self):
         f = self.main / self.NAME
         f.parent.mkdir(parents=True)
