@@ -1,5 +1,8 @@
 # Changelog
 
+## 47
+- `bash_guard` lets `cat > file <<` create a new file: Write costs the same there, so blocking only cost agents a retry (15 reports after the previous fix). Rewriting or appending to an existing project file is still refused.
+
 ## 46
 - `accept` scope check matches a scope path literally before treating `[` `*` `?` as glob: router directories like `[slug]` are names, and the check reported files under them as outside scope (4 reports).
 
