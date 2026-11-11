@@ -106,9 +106,31 @@ class Contribute(unittest.TestCase):
         self.assertIn("Related: #5", body)  # the fix is sent; the merge does not close a merely similar issue
         self.assertNotIn("Fixes", body)
 
-    def test_issue_without_commits(self):
-        out = self.p.ok("contribute", "F-1", env=self.env)
+    def test_issue_without_commits_only_on_request(self):
+        code, _, err = self.p.run("contribute", "F-1", env=self.env)  # no fix in .dpcli: no silent issue
+        self.assertEqual(code, 1)
+        self.assertIn("--issue", err)
+        self.assertFalse(any(c[:2] == ["issue", "create"] for c in self.calls()))
+        out = self.p.ok("contribute", "F-1", "--issue", env=self.env)
         self.assertIn("issues/13", out)
+
+    def test_refuses_a_fixed_cluster_until_it_recurs(self):
+        self.p.ok("feedback", "fix", "F-1", "--where", "dpcli v2")
+        code, _, err = self.p.run("contribute", "F-1", "--issue", env=self.env)
+        self.assertEqual(code, 1)
+        self.assertIn("fixed", err)
+        self.assertEqual(self.calls(), [])
+        ev = {"t": "2099-01-01T12:00:00", "by": "executor", "task": "WB-2", "ev": "reported",
+              "dp_feedback": "accept --dry still blocks"}
+        with open(self.p.root / "docs/plan/web/events.jsonl", "a") as f:
+            f.write(json.dumps(ev) + "\n")
+        self.assertIn("issues/13", self.p.ok("contribute", "F-1", "--issue", env=self.env))
+
+    def test_refuses_a_non_english_title(self):  # the hub is public and English
+        code, _, err = self.p.run("contribute", "F-1", "--issue", "--title", "Долгий accept", env=self.env)
+        self.assertEqual(code, 1)
+        self.assertIn("--title", err)
+        self.assertEqual(self.calls(), [])
 
     def test_refuses_project_scope_and_main_branch(self):
         self.p.ok("feedback", "new", "Local rule", "--match", "zzz", "--scope", "project")

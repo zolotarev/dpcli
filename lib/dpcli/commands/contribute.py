@@ -37,12 +37,18 @@ def cmd_contribute(a):
         raise DpError(f"{a.id}: no such cluster ({CLI} feedback)")
     if c["scope"] != "dpcli":
         raise DpError(f"{a.id} is project scope: fix it in .dpcli-local/, not in dpcli")
+    by_c, _ = assign(items(), {a.id: c})
+    group = by_c.get(a.id, [])
+    if c["status"] == "fixed" and not any(i["t"] > c["t_fix"] for i in group):
+        raise DpError(f"{a.id} is fixed ({c.get('pr') or c.get('where') or 'no link'}), no friction since: nothing to send")
+    title = a.title or c["title"]
+    if any(ch.isalpha() and not ch.isascii() for ch in title):
+        raise DpError(f"{a.id}: the hub is public and English, the title is not: --title \"<English title>\"")
     dist = reexec.DIST_DIR
     if run("git", "rev-parse", "--show-toplevel", cwd=dist).stdout.strip() != str(dist):
         raise DpError(f"{dist} is not a git repository (install dpcli as a submodule)")
     run("git", "fetch", "-q", "origin", cwd=dist)
     branch = run("git", "branch", "--show-current", cwd=dist).stdout.strip()
-    title = a.title or c["title"]
     log = lambda: [x for x in run("git", "log", "--format=%s", "origin/main..HEAD", cwd=dist).stdout.split("\n") if x.strip()]
     if log() and not branch.startswith(f"improve/{a.id}-"):  # the current branch is pushed: another cluster's otherwise
         raise DpError(f"commits on {branch or 'a detached HEAD'} are not {a.id}'s: move them to a branch improve/{a.id}-<slug> "
@@ -60,8 +66,6 @@ def cmd_contribute(a):
         files = run("git", "show", "--name-only", "--format=", "HEAD", cwd=dist).stdout.split()
         print(f"{a.id}: committed on {branch}: {' '.join(files)}")
     commits = log()
-    by_c, _ = assign(items(), {a.id: c})
-    group = by_c.get(a.id, [])
     ntasks = len({i["task"] for i in group if i["task"]})
     body = (f"**Friction** — {title}\n\nSeen ×{len(group)} in {ntasks} task(s) of one project."
             + (f"\n\n{c['why']}" if c.get("why") else "")
@@ -97,6 +101,9 @@ def cmd_contribute(a):
         record(a.id, "pr", url)
         print(f"{a.id}: PR {url}")
         home(dist, branch)
+    elif not a.issue:
+        raise DpError(f"{a.id}: no fix in .dpcli — edit it (test, change, VERSION, CHANGELOG), then {CLI} contribute {a.id} "
+                      f"opens a PR; only report it: --issue")
     else:
         r = run("gh", "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label", "feedback")
         if r.returncode:
@@ -182,4 +189,5 @@ def register(sp):
     q.add_argument("id", metavar="F-n")
     q.add_argument("--title", help="PR/issue title (default: the cluster title; keep it anonymized)")
     q.add_argument("--new", action="store_true", help="don't +1 a similar open PR/issue, open a new one")
+    q.add_argument("--issue", action="store_true", help="no fix in .dpcli: open an issue instead of refusing")
     q.set_defaults(func=cmd_contribute)
