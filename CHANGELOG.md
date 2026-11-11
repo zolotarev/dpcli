@@ -1,7 +1,10 @@
 # Changelog
 
-## 48
+## 49
 - `contribute` without a fix in `.dpcli` refuses with a hint instead of opening an issue, a `+1` or an offline draft (`--issue` reports on purpose); it refuses a fixed cluster with no friction since the fix, and a Cyrillic title (the hub is public and English); a committed fix bypasses the fixed refusal. Agents ran it on every cluster and filled the hub with issues, including ones for already merged fixes.
+
+## 48
+- `plan` with a section that is not found: the table-of-contents hint keeps `--contracts`, and a section named like a file next to the plan points to it (`plan <dir>/<name>.md`). Cards named another module's contracts file as a section of this one, and agents got "section not found" with no way forward (9 reports).
 
 ## 47
 - `bash_guard` lets `cat > file <<` create a new file: Write costs the same there, so blocking only cost agents a retry (15 reports after the previous fix). Rewriting or appending to an existing project file is still refused.
