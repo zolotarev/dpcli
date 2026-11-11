@@ -45,7 +45,10 @@ def cmd_plan(a):
         return
     sel = find_section(heads, a.section)
     if sel is None:
-        raise DpError(f"section \"{a.section.strip()}\" not found; table of contents: {CLI} plan {a.target}")
+        other = path.parent / f"{a.section.strip()}.md"  # cards name another contracts file as if it were a section
+        raise DpError(f"section \"{a.section.strip()}\" not found; table of contents: {CLI} plan {a.target}"
+                      + (" --contracts" if a.contracts else "")
+                      + (f"; it is a file: {CLI} plan {rel(other)}" if other.is_file() and other != path else ""))
     print("\n".join(section_body(lines, heads, sel, a.max)))
 
 

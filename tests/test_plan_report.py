@@ -51,6 +51,16 @@ class PlanSections(unittest.TestCase):
         self.assertIn("added", self.p.ok("decide", "pf", "Use B", "--by", "user", "--plan", "1. Goal"))
         self.assertIn("- **Use B** (", self.p.ok("plan", "pf", "1"))
 
+    def test_missing_section_named_like_a_contracts_file_points_to_it(self):
+        d = self.p.root / "docs" / "contracts"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "pf.md").write_text("# C\n## 1. API\n", encoding="utf-8")
+        (d / "cli.md").write_text("# CLI\n## 1. Commands\n", encoding="utf-8")
+        code, _, err = self.p.run("plan", "pf", "--contracts", "cli")
+        self.assertEqual(code, 1)
+        self.assertIn("plan pf --contracts", err)  # the table of contents of the same file
+        self.assertIn("docs/contracts/cli.md", err)
+
     def test_plan_ref_checked_at_task_new(self):
         args = ["task", "new", "pf", "--type", "dp-engineer", "--title", "t", "--goal", "g", "--scope", "src", "--no-copy"]
         for bad in ("7. Nowhere", "7. Nowhere (x)", "Goal (1)"):
