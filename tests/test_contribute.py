@@ -83,7 +83,9 @@ class Contribute(unittest.TestCase):
 
     def test_plus_one_instead_of_duplicate(self):  # nothing to add but the count
         similar = json.dumps([{"number": 5, "title": "Long accept blocks agents", "url": "https://github.com/o/r/issues/5"}])
-        out = self.p.ok("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar})
+        self.assertEqual(self.p.run("contribute", "F-1", env={**self.env, "FAKE_SEARCH": similar})[0], 1)  # no fix: --issue
+        self.assertEqual(self.calls(), [])
+        out = self.p.ok("contribute", "F-1", "--issue", env={**self.env, "FAKE_SEARCH": similar})
         self.assertIn("+1", out)
         cs = self.calls()
         self.assertTrue(any(c[:2] == ["issue", "comment"] and "5" in c for c in cs))
@@ -113,6 +115,14 @@ class Contribute(unittest.TestCase):
         self.assertFalse(any(c[:2] == ["issue", "create"] for c in self.calls()))
         out = self.p.ok("contribute", "F-1", "--issue", env=self.env)
         self.assertIn("issues/13", out)
+        nogh = self.p.tmp / "nogh"  # offline: no issue draft either
+        nogh.mkdir()
+        (nogh / "gh").write_text("#!/bin/sh\nexit 1\n")
+        (nogh / "gh").chmod(0o755)
+        code, _, err = self.p.run("contribute", "F-1", env={**self.env, "PATH": f"{nogh}:{os.environ['PATH']}"})
+        self.assertEqual(code, 1)
+        self.assertIn("--issue", err)
+        self.assertFalse((self.p.root / "build" / "dpcli" / "contribute-F-1").exists())
 
     def test_refuses_a_fixed_cluster_until_it_recurs(self):
         self.p.ok("feedback", "fix", "F-1", "--where", "dpcli v2")
@@ -136,6 +146,7 @@ class Contribute(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--title", err)
         self.assertEqual(self.calls(), [])
+        self.assertIn("issues/13", self.p.ok("contribute", "F-1", "--issue", "--title", "Café-slow accept", env=self.env))
 
     def test_refuses_project_scope_and_main_branch(self):
         self.p.ok("feedback", "new", "Local rule", "--match", "zzz", "--scope", "project")

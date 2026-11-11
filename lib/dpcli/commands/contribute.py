@@ -40,7 +40,7 @@ def cmd_contribute(a):
     by_c, _ = assign(items(), {a.id: c})
     group = by_c.get(a.id, [])
     title = a.title or c["title"]
-    if any(ch.isalpha() and not ch.isascii() for ch in title):
+    if any("Ѐ" <= ch <= "ӿ" for ch in title):  # Cyrillic; "café" is English enough
         raise DpError(f"{a.id}: the hub is public and English, the title is not: --title \"<English title>\"")
     dist = reexec.DIST_DIR
     if run("git", "rev-parse", "--show-toplevel", cwd=dist).stdout.strip() != str(dist):
@@ -66,6 +66,9 @@ def cmd_contribute(a):
     commits = log()
     if c["status"] == "fixed" and not commits and not any(i["t"] > c["t_fix"] for i in group):  # a real fix may follow a mistaken "fixed"
         raise DpError(f"{a.id} is fixed ({c.get('pr') or c.get('where') or 'no link'}), no friction since: nothing to send")
+    if not commits and not a.issue:  # before offline and +1: neither sends a fix
+        raise DpError(f"{a.id}: no fix in .dpcli — edit it (test, change, VERSION, CHANGELOG), then {CLI} contribute {a.id} "
+                      f"opens a PR; only report it: --issue")
     ntasks = len({i["task"] for i in group if i["task"]})
     body = (f"**Friction** — {title}\n\nSeen ×{len(group)} in {ntasks} task(s) of one project."
             + (f"\n\n{c['why']}" if c.get("why") else "")
@@ -101,9 +104,6 @@ def cmd_contribute(a):
         record(a.id, "pr", url)
         print(f"{a.id}: PR {url}")
         home(dist, branch)
-    elif not a.issue:
-        raise DpError(f"{a.id}: no fix in .dpcli — edit it (test, change, VERSION, CHANGELOG), then {CLI} contribute {a.id} "
-                      f"opens a PR; only report it: --issue")
     else:
         r = run("gh", "issue", "create", "--repo", repo, "--title", title, "--body", body, "--label", "feedback")
         if r.returncode:

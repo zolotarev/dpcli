@@ -1,5 +1,5 @@
 name: implement
-# A `feedback` issue from a trusted author (owner, member, collaborator — `dpcli contribute` without a fix) becomes a PR:
+# A `feedback` issue from a trusted author (owner, member, collaborator — `dpcli contribute --issue`, a friction reported without a fix) becomes a PR:
 # the agent implements it or closes it as not planned with the reason; the PR then goes through review.yml's loop.
 on:
   issues:
