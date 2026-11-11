@@ -25,7 +25,7 @@ class BashGuard(unittest.TestCase):
                     "sed -n -i 's/a/b/' f", "sed -e 's/a/b/' -i f", "perl -e 's/a/b/' -pi f",  # -i anywhere
                     "echo \"<<EOF\"\nsed -i 's/a/b/' f",  # a quoted "<<EOF" opens no heredoc
                     "sed -i s/a/b/ src/x.ts; rm /tmp/y", "sed -i s/a/b/ src/x.ts && rm /tmp/z",  # target of its own segment
-                    "cat > src/x.ts <<'EOF'\nx\nEOF", "python3 - <<'EOF'\nfrom pathlib import Path\nPath('a').write_text('x')\nEOF",
+                    "python3 - <<'EOF'\nfrom pathlib import Path\nPath('a').write_text('x')\nEOF",
                     "python3 - <<'EOF'\nopen('a', 'w').write('x')\nEOF"):
             code, err = run(cmd)
             self.assertEqual(code, 2, cmd)
@@ -40,6 +40,17 @@ class BashGuard(unittest.TestCase):
                     "python3 - <<'EOF'\nopen('build/a.txt', 'w').write('x')\nEOF"):
             self.assertEqual(run(cmd, p.root)[0], 0, cmd)
         self.assertEqual(run("sed -i s/a/b/ src/x.ts", p.root)[0], 2)
+
+    def test_cat_heredoc_blocks_existing_files_only(self):  # a new file costs Write the same: nothing to save
+        p = Project()
+        self.addCleanup(p.cleanup)
+        (p.root / "src").mkdir(exist_ok=True)
+        (p.root / "src/x.ts").write_text("x")
+        for cmd in ("cat > src/x.ts <<'EOF'\ny\nEOF", "cat >> src/x.ts <<'EOF'\ny\nEOF"):
+            code, err = run(cmd, p.root)
+            self.assertEqual(code, 2, cmd)
+            self.assertIn("Edit", err)
+        self.assertEqual(run("cat > src/new.ts <<'EOF'\ny\nEOF", p.root)[0], 0)
 
     def test_allows_programs_reads_and_quoted_text(self):
         for cmd in ("rg -n foo src", "sed -n '1,20p' f", "python3 - <<'EOF'\nprint(1)\nEOF", "cat f | jq .",

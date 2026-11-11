@@ -1,7 +1,10 @@
 # Changelog
 
-## 47
+## 48
 - `contribute` without a fix in `.dpcli` refuses with a hint instead of opening an issue, a `+1` or an offline draft (`--issue` reports on purpose); it refuses a fixed cluster with no friction since the fix, and a Cyrillic title (the hub is public and English); a committed fix bypasses the fixed refusal. Agents ran it on every cluster and filled the hub with issues, including ones for already merged fixes.
+
+## 47
+- `bash_guard` lets `cat > file <<` create a new file: Write costs the same there, so blocking only cost agents a retry (15 reports after the previous fix). Rewriting or appending to an existing project file is still refused.
 
 ## 46
 - `accept` scope check matches a scope path literally before treating `[` `*` `?` as glob: router directories like `[slug]` are names, and the check reported files under them as outside scope (4 reports).

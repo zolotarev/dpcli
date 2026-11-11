@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse hook (Bash): refuse editing project files through the shell (sed -i, perl -i, cat > file <<, python3 -
 heredocs that write); Edit/Write pay only the change. Exit 2 = blocked. Temporary and git-ignored files (build
-output) pass; echo/tee > file are not covered on purpose."""
+output) and new files from cat heredocs pass; echo/tee > file are not covered on purpose."""
 import json
+import os
 import re
 import subprocess
 import sys
@@ -48,6 +49,8 @@ def edits(ln):
             continue
         seg = re.split(r"[|;&]", ln[m.end():], maxsplit=1)[0]  # this command only, not `; rm /tmp/x` after it
         target = m.group(1) if m.groups() else (seg.split() or [""])[-1]
+        if what == "cat > file <<" and not os.path.exists(target):  # a new file: Write would cost the same
+            continue
         if not scratch(target):
             return what
     return None
@@ -67,7 +70,7 @@ def main():
     if not hits:
         return 0
     print(f"dpcli: {hits[0]} edits project files through the shell. Read the file first (cat in Bash does not count), "
-          f"then Edit (exact replacement); a new file — Write; bulk renames: ast-grep run -p OLD -r NEW -U. "
+          f"then Edit (exact replacement); a new file — Write or cat > file <<; bulk renames: ast-grep run -p OLD -r NEW -U. "
           f"Temporary (/tmp) and git-ignored files (build/) are fine.", file=sys.stderr)
     return 2
 
