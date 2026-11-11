@@ -1,7 +1,7 @@
 # Changelog
 
 ## 47
-- `contribute` without a fix in `.dpcli` refuses with a hint instead of opening an issue (`--issue` opens one on purpose); it refuses a fixed cluster with no friction since the fix, and a non-English title (the hub is public). Agents ran it on every cluster and filled the hub with issues, including ones for already merged fixes.
+- `contribute` without a fix in `.dpcli` refuses with a hint instead of opening an issue (`--issue` opens one on purpose); it refuses a fixed cluster with no friction since the fix, and a non-English title (the hub is public); a committed fix bypasses the fixed refusal. Agents ran it on every cluster and filled the hub with issues, including ones for already merged fixes.
 
 ## 46
 - `accept` scope check matches a scope path literally before treating `[` `*` `?` as glob: router directories like `[slug]` are names, and the check reported files under them as outside scope (4 reports).

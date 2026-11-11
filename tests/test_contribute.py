@@ -126,6 +126,11 @@ class Contribute(unittest.TestCase):
             f.write(json.dumps(ev) + "\n")
         self.assertIn("issues/13", self.p.ok("contribute", "F-1", "--issue", env=self.env))
 
+    def test_a_committed_fix_bypasses_the_fixed_refusal(self):  # "fixed" was marked by mistake
+        self.p.ok("feedback", "fix", "F-1", "--where", "dpcli v2")
+        self.improve()
+        self.assertIn("pull/12", self.p.ok("contribute", "F-1", env=self.env))
+
     def test_refuses_a_non_english_title(self):  # the hub is public and English
         code, _, err = self.p.run("contribute", "F-1", "--issue", "--title", "Долгий accept", env=self.env)
         self.assertEqual(code, 1)

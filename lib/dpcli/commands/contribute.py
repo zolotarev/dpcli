@@ -39,8 +39,6 @@ def cmd_contribute(a):
         raise DpError(f"{a.id} is project scope: fix it in .dpcli-local/, not in dpcli")
     by_c, _ = assign(items(), {a.id: c})
     group = by_c.get(a.id, [])
-    if c["status"] == "fixed" and not any(i["t"] > c["t_fix"] for i in group):
-        raise DpError(f"{a.id} is fixed ({c.get('pr') or c.get('where') or 'no link'}), no friction since: nothing to send")
     title = a.title or c["title"]
     if any(ch.isalpha() and not ch.isascii() for ch in title):
         raise DpError(f"{a.id}: the hub is public and English, the title is not: --title \"<English title>\"")
@@ -66,6 +64,8 @@ def cmd_contribute(a):
         files = run("git", "show", "--name-only", "--format=", "HEAD", cwd=dist).stdout.split()
         print(f"{a.id}: committed on {branch}: {' '.join(files)}")
     commits = log()
+    if c["status"] == "fixed" and not commits and not any(i["t"] > c["t_fix"] for i in group):  # a real fix may follow a mistaken "fixed"
+        raise DpError(f"{a.id} is fixed ({c.get('pr') or c.get('where') or 'no link'}), no friction since: nothing to send")
     ntasks = len({i["task"] for i in group if i["task"]})
     body = (f"**Friction** — {title}\n\nSeen ×{len(group)} in {ntasks} task(s) of one project."
             + (f"\n\n{c['why']}" if c.get("why") else "")
