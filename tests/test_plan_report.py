@@ -56,7 +56,7 @@ class PlanSections(unittest.TestCase):
         d.mkdir(parents=True, exist_ok=True)
         (d / "pf.md").write_text("# C\n## 1. API\n", encoding="utf-8")
         (d / "cli.md").write_text("# CLI\n## 1. Commands\n", encoding="utf-8")
-        code, _, err = self.p.run("plan", "pf", "--contracts", "cli")
+        code, _, err = self.p.run("plan", "pf", "cli", "--contracts")  # flag last: Python 3.10 argparse
         self.assertEqual(code, 1)
         self.assertIn("plan pf --contracts", err)  # the table of contents of the same file
         self.assertIn("docs/contracts/cli.md", err)
