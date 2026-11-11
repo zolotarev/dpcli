@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PR gate beyond tests: a changes/<name>.md note for distribution changes (VERSION and CHANGELOG are the merge's), anonymity of added lines, diff size.
+"""PR gate beyond tests: VERSION bump + CHANGELOG for distribution changes, anonymity of added lines, diff size.
 
   python3 tools/pr_checks.py <base-ref>      # e.g. origin/main
 """
@@ -7,7 +7,6 @@ import re
 import subprocess
 import sys
 
-INIT = "lib/dpcli/__init__.py"
 DIST = ("dpcli", "lib/", "agents/", "skills/", "templates/", "dpcli.example.yml", "install.sh")
 MAX_DIFF = 1500
 LEAKS = [(r"(?<![\w.])/(?:root|home/[\w.-]+|Users/[\w.-]+)/", "absolute home path"),
@@ -18,13 +17,19 @@ def git(*a):
     return subprocess.run(["git", *a], capture_output=True, text=True, check=True).stdout
 
 
+def version(ref):
+    return int(re.search(r"^VERSION = (\d+)", git("show", f"{ref}:lib/dpcli/__init__.py"), re.M)[1])
+
+
 def main(base):
     errs = []
     files = [f for f in git("diff", "--name-only", f"{base}...HEAD").splitlines() if f]
-    if "CHANGELOG.md" in files or re.search(r"^\+VERSION", git("diff", f"{base}...HEAD", "--", INIT), re.M):
-        errs.append("VERSION and CHANGELOG.md are set at the merge: revert them, put the CHANGELOG line into changes/<name>.md")
-    if any(f.startswith(DIST) for f in files) and not git("diff", "--name-only", "--diff-filter=A", f"{base}...HEAD", "--", "changes/").strip():
-        errs.append("distribution changed: add changes/<name>.md with the CHANGELOG line ('- …')")
+    if any(f.startswith(DIST) for f in files):
+        old, new = version(base), version("HEAD")
+        if new <= old:
+            errs.append(f"distribution changed: bump VERSION in lib/dpcli/__init__.py (base {old})")
+        elif not re.search(rf"^## {new}\b", git("show", "HEAD:CHANGELOG.md"), re.M):
+            errs.append(f"CHANGELOG.md: add a section '## {new}'")
     added = [l[1:] for l in git("diff", "-U0", f"{base}...HEAD", "--", ".", ":(exclude)tests/").splitlines()
              if l.startswith("+") and not l.startswith("+++")]
     for rx, what in LEAKS:

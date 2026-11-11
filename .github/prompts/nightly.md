@@ -15,5 +15,5 @@ In order of value:
 - If nothing worthwhile (< ~20 lines or < ~100 tokens), stop without a PR.
 
 ## Deliver
-1. `git switch -c nightly/<run id>`; make the change; `python3 -m unittest discover -s tests`; `python3 tools/metrics.py --write-budgets` (budgets go down to the new values); add `changes/nightly-<run id>.md` with one CHANGELOG line (`VERSION` and `CHANGELOG.md` are set at the merge).
+1. `git switch -c nightly/<run id>`; make the change; `python3 -m unittest discover -s tests`; `python3 tools/metrics.py --write-budgets` (budgets go down to the new values); bump `VERSION` in `lib/dpcli/__init__.py`; add a `## <N>` CHANGELOG section with one line.
 2. Commit, `git push -u origin HEAD`, `gh label create nightly-simplify --color 5319E7` (ignore "exists"), then `gh pr create --base main --label nightly-simplify --title "nightly: <what got smaller>" --body "<before → after numbers from metrics; what was removed and why behaviour is unchanged>"`.

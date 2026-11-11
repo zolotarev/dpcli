@@ -14,7 +14,6 @@ from helpers import REPO, git
 sys.path.insert(0, str(REPO / "tools"))
 import metrics  # noqa: E402
 import decide  # noqa: E402
-import pr_checks  # noqa: E402
 import sync  # noqa: E402
 
 INIT = '"""doc."""\n\nVERSION = {}  # bump\n'
@@ -32,7 +31,7 @@ class Sync(unittest.TestCase):
         git("clone", "-q", str(origin), str(self.base), cwd=self.tmp)
         for k, v in (("user.name", "t"), ("user.email", "t@example.com")):
             git("config", k, v, cwd=self.base)
-        self.write({"lib/dpcli/__init__.py": INIT.format(29), "CHANGELOG.md": LOG.format(""), "lib/a.py": "x = 1\n"}, "base")
+        self.write({sync.INIT: INIT.format(29), sync.LOG: LOG.format(""), "lib/a.py": "x = 1\n"}, "base")
         git("push", "-q", "origin", "HEAD:main", cwd=self.base)
         os.environ["RUNNER_TEMP"] = str(self.tmp)
         sync.gh = lambda *a, **k: self.calls.append(a) or json.dumps({"headRefName": "pr", "isCrossRepository": False})
@@ -73,13 +72,15 @@ class Sync(unittest.TestCase):
     def pushed(self, f):
         return git("show", f"origin/pr:{f}", cwd=self.base) + "\n"
 
-    def test_clean_merge_pushed_and_tested(self):
-        self.pr({"lib/a.py": "x = 2\n", "changes/a.md": "- mine.\n"})
-        self.main_moves({"lib/dpcli/__init__.py": INIT.format(30), "CHANGELOG.md": LOG.format("## 30\n- y.\n\n")})
+    def test_parallel_bump_resolved_and_the_prs_other_edits_kept(self):
+        self.pr({sync.INIT: '"""doc, edited."""\n\nVERSION = 30  # bump\n',
+                 sync.LOG: LOG.format("## 30\n- mine.\n\n").replace("- c.", "- c, fixed.")})
+        self.main_moves({sync.INIT: INIT.format(31), sync.LOG: LOG.format("## 31\n- y.\n\n## 30\n- x.\n\n")})
         self.assertEqual(self.sync(), 0)
         git("fetch", "-q", "origin", cwd=self.base)
-        self.assertEqual(self.pushed("lib/dpcli/__init__.py"), INIT.format(30))
-        self.assertEqual(self.pushed("changes/a.md"), "- mine.\n")
+        self.assertEqual(self.pushed(sync.INIT), '"""doc, edited."""\n\nVERSION = 32  # bump\n')
+        self.assertEqual(self.pushed(sync.LOG), LOG.format("## 32\n- mine.\n\n## 31\n- y.\n\n## 30\n- x.\n\n")
+                         .replace("- c.", "- c, fixed."))
         self.assertIn(("workflow", "run", "test.yml", "--ref", "pr", "-f", "ref=pr"), self.calls)
 
     def test_code_conflict_sends_back(self):
@@ -98,6 +99,18 @@ class Sync(unittest.TestCase):
         self.assertEqual([c for c in self.calls if c[0] != "pr"], [])  # no label, no test dispatch
         git("fetch", "-q", "origin", cwd=self.base)
         self.assertEqual(git("rev-parse", "origin/pr", cwd=self.base), git("rev-parse", "refs/pull/7/head", cwd=str(self.tmp / "origin.git")))
+
+    def test_symlinked_changelog_is_not_written_through(self):
+        self.pr({sync.INIT: INIT.format(30), sync.LOG: LOG.format("## 30\n- mine.\n\n")})
+        self.main_moves({sync.INIT: INIT.format(31)})  # VERSION collides, CHANGELOG.md merges in as the PR's symlink
+        git("switch", "-q", "pr", cwd=self.base)
+        os.remove(self.base / sync.LOG)
+        os.symlink("/etc/hostname", self.base / sync.LOG)
+        git("commit", "-q", "-am", "link", cwd=self.base)
+        git("push", "-q", "-f", "origin", "HEAD:pr", "HEAD:refs/pull/7/head", cwd=self.base)
+        git("switch", "-q", "--detach", "origin/main", cwd=self.base)
+        self.assertIn("symlink", self.sync())
+        self.assertIn(("label", "7", "rework", ["rejected"]), self.calls)
 
     def test_up_to_date_does_nothing(self):
         self.pr({"lib/a.py": "x = 2\n"})
@@ -230,94 +243,6 @@ class CloseAfterMerge(unittest.TestCase):
         self.assertEqual(self.run_main(None), [])
 
 
-class Bump(unittest.TestCase):
-    """decide.bump after the squash-merge: VERSION + 1, a CHANGELOG section from changes/*.md, pushed to main."""
-
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp, True)
-        origin, self.base = self.tmp / "origin.git", self.tmp / "base"
-        git("init", "-q", "--bare", "-b", "main", str(origin), cwd=self.tmp)
-        git("clone", "-q", str(origin), str(self.base), cwd=self.tmp)
-        for k, v in (("user.name", "t"), ("user.email", "t@example.com")):
-            git("config", k, v, cwd=self.base)
-        self.files({"lib/dpcli/__init__.py": INIT.format(29), "CHANGELOG.md": LOG.format("")})
-        os.environ["RUNNER_TEMP"] = str(self.tmp)
-        self.addCleanup(os.environ.pop, "RUNNER_TEMP", None)
-        cwd = os.getcwd()
-        os.chdir(self.base)
-        self.addCleanup(os.chdir, cwd)
-
-    def files(self, files):
-        for f, text in files.items():
-            (self.base / f).parent.mkdir(parents=True, exist_ok=True)
-            (self.base / f).write_text(text, encoding="utf-8")
-        git("add", "-A", cwd=self.base)
-        git("commit", "-q", "-m", "merged", cwd=self.base)
-        git("push", "-q", "origin", "HEAD:main", cwd=self.base)
-
-    def main_file(self, f):
-        git("fetch", "-q", "origin", cwd=self.base)
-        return git("show", f"origin/main:{f}", cwd=self.base) + "\n"
-
-    def test_notes_become_the_next_section_and_go(self):
-        self.files({"changes/b.md": "- second.\n", "changes/a.md": "- first.\n"})
-        self.assertEqual(decide.bump("7"), 30)
-        self.assertEqual(self.main_file("lib/dpcli/__init__.py"), INIT.format(30))
-        self.assertEqual(self.main_file("CHANGELOG.md"), LOG.format("## 30\n- first.\n- second.\n\n"))
-        self.assertEqual(git("ls-tree", "origin/main", "changes/", cwd=self.base), "")
-
-    def test_no_notes_no_bump(self):  # docs or CI only
-        self.assertIsNone(decide.bump("7"))
-        self.assertEqual(self.main_file("lib/dpcli/__init__.py"), INIT.format(29))
-
-    def test_symlinked_note_is_not_read(self):  # merged PR content: never copy a runner file into the CHANGELOG
-        (self.base / "changes").mkdir()
-        os.symlink("/etc/hostname", self.base / "changes" / "x.md")
-        self.files({})
-        self.assertIsNone(decide.bump("7"))
-        self.assertEqual(self.main_file("CHANGELOG.md"), LOG.format(""))
-
-
-class PrChecks(unittest.TestCase):
-    """tools/pr_checks.py: PRs leave VERSION and CHANGELOG.md to the merge; a distribution change brings changes/<name>.md."""
-
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp, True)
-        git("init", "-q", "-b", "main", cwd=self.tmp)
-        for k, v in (("user.name", "t"), ("user.email", "t@example.com")):
-            git("config", k, v, cwd=self.tmp)
-        self.commit({"lib/dpcli/__init__.py": INIT.format(29), "CHANGELOG.md": LOG.format(""), "lib/a.py": "x = 1\n"})
-        git("branch", "base", cwd=self.tmp)
-        cwd = os.getcwd()
-        os.chdir(self.tmp)
-        self.addCleanup(os.chdir, cwd)
-
-    def commit(self, files):
-        for f, text in files.items():
-            (self.tmp / f).parent.mkdir(parents=True, exist_ok=True)
-            (self.tmp / f).write_text(text, encoding="utf-8")
-        git("add", "-A", cwd=self.tmp)
-        git("commit", "-q", "-m", "c", cwd=self.tmp)
-
-    def test_version_and_changelog_are_left_to_the_merge(self):
-        self.commit({"lib/a.py": "x = 2\n", "changes/a.md": "- a.\n"})
-        self.assertEqual(pr_checks.main("base"), 0)
-        self.commit({"lib/dpcli/__init__.py": INIT.format(30)})
-        self.assertEqual(pr_checks.main("base"), 1)
-
-    def test_changelog_edit_refused(self):
-        self.commit({"lib/a.py": "x = 2\n", "changes/a.md": "- a.\n", "CHANGELOG.md": LOG.format("## 30\n- a.\n\n")})
-        self.assertEqual(pr_checks.main("base"), 1)
-
-    def test_distribution_change_needs_a_note(self):
-        self.commit({"lib/a.py": "x = 2\n"})
-        self.assertEqual(pr_checks.main("base"), 1)
-        self.commit({"changes/a.md": "- a.\n"})
-        self.assertEqual(pr_checks.main("base"), 0)
-
-
 class Stuck(unittest.TestCase):
     """decide.stuck: a PR pushed long ago and never reviewed since is picked up again."""
 
@@ -335,8 +260,11 @@ class Stuck(unittest.TestCase):
                {"number": 6, **commit("2026-11-03T10:00:00Z"), "comments": []},  # idle over a day: given up
                {"number": 7, **commit("2026-11-05T16:09:00Z"), "comments": [], "isDraft": True}]
         now = dt.datetime(2026, 11, 5, 18, 0, tzinfo=dt.timezone.utc).timestamp()
-        with mock.patch.object(decide, "gh", lambda *a, **k: json.dumps(prs)):
+        calls = []
+        with mock.patch.object(decide, "gh", lambda *a, **k: calls.append(a) or json.dumps(prs)):
             self.assertEqual(decide.stuck(now), ["1", "4"])
+        # GitHub prices the query up front: limit × 100 commits × 100 authors must stay under 500,000 nodes
+        self.assertLessEqual(int(calls[0][calls[0].index("--limit") + 1]) * 100 * 100, 500_000)
 
 
 class ApproveCli(unittest.TestCase):

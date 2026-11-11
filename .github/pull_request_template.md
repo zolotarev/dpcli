@@ -4,7 +4,7 @@
 
 **Proof**
 - [ ] a test reproduces the friction and passes now
-- [ ] `changes/<name>.md` has the CHANGELOG line (`VERSION` and `CHANGELOG.md` untouched)
+- [ ] `VERSION` bumped, `CHANGELOG.md` line added
 - [ ] output stays terse; agent prompts / templates did not grow (or the budget increase is justified below)
 - [ ] journals remain backward compatible
 

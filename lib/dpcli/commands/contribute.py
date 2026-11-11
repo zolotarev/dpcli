@@ -67,7 +67,7 @@ def cmd_contribute(a):
     if c["status"] == "fixed" and not commits and not any(i["t"] > c["t_fix"] for i in group):  # a real fix may follow a mistaken "fixed"
         raise DpError(f"{a.id} is fixed ({c.get('pr') or c.get('where') or 'no link'}), no friction since: nothing to send")
     if not commits and not a.issue:  # before offline and +1: neither sends a fix
-        raise DpError(f"{a.id}: no fix in .dpcli — edit it (test, change, changes/{a.id}.md), then {CLI} contribute {a.id} "
+        raise DpError(f"{a.id}: no fix in .dpcli — edit it (test, change, VERSION, CHANGELOG), then {CLI} contribute {a.id} "
                       f"opens a PR; only report it: --issue")
     ntasks = len({i["task"] for i in group if i["task"]})
     body = (f"**Friction** — {title}\n\nSeen ×{len(group)} in {ntasks} task(s) of one project."
