@@ -335,8 +335,11 @@ class Stuck(unittest.TestCase):
                {"number": 6, **commit("2026-11-03T10:00:00Z"), "comments": []},  # idle over a day: given up
                {"number": 7, **commit("2026-11-05T16:09:00Z"), "comments": [], "isDraft": True}]
         now = dt.datetime(2026, 11, 5, 18, 0, tzinfo=dt.timezone.utc).timestamp()
-        with mock.patch.object(decide, "gh", lambda *a, **k: json.dumps(prs)):
+        calls = []
+        with mock.patch.object(decide, "gh", lambda *a, **k: calls.append(a) or json.dumps(prs)):
             self.assertEqual(decide.stuck(now), ["1", "4"])
+        # GitHub prices the query up front: limit × 100 commits × 100 authors must stay under 500,000 nodes
+        self.assertLessEqual(int(calls[0][calls[0].index("--limit") + 1]) * 100 * 100, 500_000)
 
 
 class ApproveCli(unittest.TestCase):

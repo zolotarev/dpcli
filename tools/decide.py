@@ -176,7 +176,8 @@ def stuck(now=None, quiet=5400, give_up=86400):
     now = now or time.time()
     out = []
     ts = lambda t: dt.datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
-    for p in json.loads(gh("pr", "list", "--state", "open", "--limit", "100", "--json",
+    # 40: GraphQL prices limit × 100 commits × 100 authors up front and refuses over 500,000 nodes
+    for p in json.loads(gh("pr", "list", "--state", "open", "--limit", "40", "--json",
                            "number,commits,comments,updatedAt,isDraft")):
         idle = now - max(ts(p["commits"][-1]["committedDate"]), ts(p.get("updatedAt") or "1970-01-01T00:00:00Z"))
         if p.get("isDraft") or not quiet <= idle < give_up:  # draft; a review may be running; the sweep gave up
