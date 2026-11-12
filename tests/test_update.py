@@ -79,6 +79,19 @@ class Update(unittest.TestCase):
         self.assertIn(f"dpcli v{n}", git("log", "-1", "--format=%s", cwd=self.p.root))
         self.assertIn("up to date", self.p.ok("update", env=self.env))
 
+    def test_protect_main_leaves_update_uncommitted(self):
+        cfg = self.p.root / "dpcli.json"
+        cfg.write_text(json.dumps({**json.loads(cfg.read_text()), "protect_main": True}))
+        self.p.commit_all("protect main")
+        before = git("rev-parse", "HEAD", cwd=self.p.root)
+        n = self.v0 + 1
+        self.release(n)
+        out = self.p.ok("update", env=self.env)
+        self.assertIn("main is protected", out)
+        self.assertEqual(self.head_version(), n)
+        self.assertEqual(git("rev-parse", "HEAD", cwd=self.p.root), before)  # no commit on main
+        self.assertIn(".dpcli", git("status", "--porcelain", cwd=self.p.root))
+
     def test_dpcli_sits_on_main_and_stale_remote_branches_go(self):
         d = self.p.root / ".dpcli"
         self.p.ok("update", env=self.env)  # up to date, detached on its tag → branch main
