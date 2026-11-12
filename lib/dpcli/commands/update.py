@@ -97,7 +97,7 @@ def update_dist(a):
                 return [f"dpcli v{VERSION}: .claude is stale and init failed — fix and run {CLI} init: {err}"]
             if run(sys.executable, str(reexec.entry()), "init", "--check", cwd=root).returncode:
                 return [f"dpcli v{VERSION}: .claude stays stale after init (edited by hand?) — see {CLI} init --check"]
-            return [f"dpcli v{VERSION}: .claude re-rendered" + (f", committed {h}" if h else "")]
+            return [f"dpcli v{VERSION}: .claude re-rendered" + committed(h)]
         return [f"dpcli v{VERSION} is up to date" + (f" (pinned v{pin})" if pin else "")] if not a.auto else []
     target = cand[-1]
     if a.check:
@@ -109,11 +109,18 @@ def update_dist(a):
     if err:
         return [f"update: v{target} checked out, but init failed — fix and run {CLI} init: {err}"]
     notes = changelog(dist, f"v{target}", VERSION, target)
-    return [f"dpcli v{VERSION} → v{target}" + (f", committed {h}" if h else "")] + [f"  {x}" for x in notes]
+    return [f"dpcli v{VERSION} → v{target}" + committed(h)] + [f"  {x}" for x in notes]
+
+
+def committed(h):
+    if h is None:
+        return f", not committed: {config.main_branch()} is protected (protect_main) — commit it on a branch, deliver via MR"
+    return f", committed {h}" if h else ""
 
 
 def render_and_commit(root, msg):
-    """init + commit of the generated files. -> (commit hash or "" when nothing changed, None | init's error)."""
+    """init + commit of the generated files.
+    -> (commit hash, "" when nothing changed, None when held off a protected main; None | init's error)."""
     r = run(sys.executable, str(reexec.entry()), "init", cwd=root)
     if r.returncode:
         return "", short((r.stderr or r.stdout).strip(), 200) or f"exit {r.returncode}"
@@ -121,6 +128,8 @@ def render_and_commit(root, msg):
     extra = [str(wf.relative_to(root.resolve()))] if root.resolve() in wf.parents else []  # outside the repo: not ours to commit
     paths = [p for p in GENERATED + extra if (root / p).exists()]
     if run("git", "status", "--porcelain", "--", *paths, cwd=root).stdout.strip():
+        if config.get("protect_main") and run("git", "branch", "--show-current", cwd=root).stdout.strip() == config.main_branch():
+            return None, None
         return gitx.commit_paths(root, paths, lang_commit(msg, msg)), None
     return "", None
 
