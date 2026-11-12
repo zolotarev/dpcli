@@ -1,1 +1,0 @@
-- `update` honours `protect_main`: on the protected main branch the re-rendered bump stays uncommitted (commit it on a branch, deliver via MR) instead of a direct commit to main.

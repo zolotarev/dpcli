@@ -1,5 +1,8 @@
 # Changelog
 
+## 51
+- `update` honours `protect_main`: on the protected main branch the re-rendered bump stays uncommitted (commit it on a branch, deliver via MR) instead of a direct commit to main.
+
 ## 50
 - PRs no longer touch `VERSION` or `CHANGELOG.md`: a distribution change brings `changes/<name>.md` with its CHANGELOG line, and the merge bumps `VERSION`, turns the notes into the `## N` section and tags the release (`tools/decide.py` bump, checked by `tools/pr_checks.py`). Parallel PRs collided on both and stalled in rework while their code was accepted; `tools/sync.py` drops its conflict resolver.
 - The `stuck` sweep lists at most 40 open PRs: with `--limit 100` GitHub refused the `commits` query (1,000,000 possible nodes > 500,000) and every hourly run failed since 2026-11-05.
