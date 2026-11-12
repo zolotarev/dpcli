@@ -1,13 +1,13 @@
 {
   "code_lines": 6024,
-  "prompt_tokens": 7035,
-  "prompt_max": 3236,
+  "prompt_tokens": 7000,
+  "prompt_max": 3194,
   "duplicate_windows": 0,
   "risky": {
     "rm -rf": 0,
     "force": 22,
     "reset --hard": 0,
     "shell=True": 0,
-    "push": 4
+    "push": 3
   }
 }
