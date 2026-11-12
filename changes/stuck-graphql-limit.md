@@ -1,1 +1,0 @@
-- The `stuck` sweep lists at most 40 open PRs: with `--limit 100` GitHub refused the `commits` query (1,000,000 possible nodes > 500,000) and every hourly run failed since 2026-11-05.

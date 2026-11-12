@@ -1,5 +1,9 @@
 # Changelog
 
+## 50
+- PRs no longer touch `VERSION` or `CHANGELOG.md`: a distribution change brings `changes/<name>.md` with its CHANGELOG line, and the merge bumps `VERSION`, turns the notes into the `## N` section and tags the release (`tools/decide.py` bump, checked by `tools/pr_checks.py`). Parallel PRs collided on both and stalled in rework while their code was accepted; `tools/sync.py` drops its conflict resolver.
+- The `stuck` sweep lists at most 40 open PRs: with `--limit 100` GitHub refused the `commits` query (1,000,000 possible nodes > 500,000) and every hourly run failed since 2026-11-05.
+
 ## 49
 - `contribute` without a fix in `.dpcli` refuses with a hint instead of opening an issue, a `+1` or an offline draft (`--issue` reports on purpose); it refuses a fixed cluster with no friction since the fix, and a Cyrillic title (the hub is public and English); a committed fix bypasses the fixed refusal. Agents ran it on every cluster and filled the hub with issues, including ones for already merged fixes.
 
