@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """After the AI review: wait for the `test` workflow, then act on the latest `VERDICT:` comment.
-accept + green → squash-merge, tag vN, release; rework (or red tests) → label `rework`; reject → label and close.
+accept + green → squash-merge, VERSION + 1 from changes/*.md (bump), tag vN, release; rework (or red tests) → label `rework`; reject → label and close.
 Runs from the base branch only (trusted code)."""
 import datetime as dt
 import json
@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 REVIEWERS = {"github-actions", "github-actions[bot]", "app/github-actions"}
 MAX_ROUNDS = 5  # automatic rework rounds per PR; then it waits for its author (nightly: closed by the next nightly)
@@ -59,6 +60,41 @@ def approve(pr):
     return runs
 
 
+def released(init, log, notes):
+    """(init, log, n): VERSION + 1 and a `## n` section of the notes on top of CHANGELOG.md."""
+    n = int(re.search(r"^VERSION = (\d+)", init, re.M)[1]) + 1
+    init = re.sub(r"^VERSION = \d+", f"VERSION = {n}", init, count=1, flags=re.M)
+    head, sep, rest = log.partition("\n## ")
+    section = f"## {n}\n" + "\n".join(x.strip() for x in notes) + "\n"
+    return init, f"{head.rstrip()}\n\n{section}" + (f"\n## {rest}" if sep else ""), n
+
+
+def bump(pr, tries=3):
+    """After the squash-merge: VERSION + 1 and a CHANGELOG section from the merged changes/*.md, pushed to main.
+    PRs touch neither (tools/pr_checks.py), so parallel PRs never collide on them. Notes a failed bump leaves on
+    main go out with the next one."""
+    for _ in range(tries):
+        subprocess.run(["git", "fetch", "-q", "origin", "main"], check=True)
+        wt = Path(os.environ.get("RUNNER_TEMP") or "/tmp", f"bump-{pr}")
+        subprocess.run(["git", "worktree", "add", "-q", "-f", "--detach", str(wt), "origin/main"], check=True)
+        try:
+            notes = sorted((wt / "changes").glob("*.md"))
+            if not notes or any(p.is_symlink() for p in notes):  # merged PR content: never read through a link
+                return None
+            init, log = wt / "lib/dpcli/__init__.py", wt / "CHANGELOG.md"
+            new_init, new_log, n = released(init.read_text(), log.read_text(), [p.read_text() for p in notes])
+            init.write_text(new_init)
+            log.write_text(new_log)
+            subprocess.run(["git", "rm", "-q", *map(str, notes)], cwd=wt, check=True)
+            subprocess.run(["git", "commit", "-qam", f"v{n}"], cwd=wt, check=True)
+            if subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=wt).returncode == 0:
+                return n
+        finally:
+            subprocess.run(["git", "worktree", "remove", "-f", str(wt)], capture_output=True)
+    print(f"#{pr}: main kept moving, VERSION not bumped; its notes go out with the next merge")
+    return None
+
+
 def release():
     subprocess.run(["git", "fetch", "-q", "--tags", "origin", "main"], check=True)
     init = subprocess.run(["git", "show", "origin/main:lib/dpcli/__init__.py"], capture_output=True, text=True).stdout
@@ -95,6 +131,7 @@ def main(pr):
                    "main moved during the review; push again (or merge main) to re-sync and re-review.")
                 label(pr, "rework", ["rejected"])
                 return print(f"#{pr}: merge failed")
+            bump(pr)
             tag = release()
             # closing keywords: GitHub may skip them for the workflow token's merge
             for i in json.loads(gh("pr", "view", pr, "--json", "closingIssuesReferences", check=False) or "{}").get("closingIssuesReferences", []):

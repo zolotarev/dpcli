@@ -9,7 +9,7 @@ A portable process tool for projects run by Claude Code agents. User docs — [R
 
 ## Rules
 - Python ≥ 3.10 standard library and git only; no new dependencies (Ollama for `search --sem` is optional).
-- Any change to the distribution → bump `VERSION` in `lib/dpcli/__init__.py` (stale copies re-exec the main one by it, `reexec.py`) and add a `CHANGELOG.md` line.
+- Any change to the distribution → a `changes/<name>.md` file with its CHANGELOG line (`- …`). `VERSION` and `CHANGELOG.md` are the merge's (`tools/decide.py` bump; stale copies re-exec the main one by `VERSION`, `reexec.py`): a PR never edits them.
 - Fixing a friction: first a test that reproduces it, then the change.
 - Before committing: `python3 -m unittest discover -s tests` (~1 min), all green.
 - Requirements come from agent feedback (`dp_feedback`, `harness:` notes) in projects that use dpcli; no data — no feature.
