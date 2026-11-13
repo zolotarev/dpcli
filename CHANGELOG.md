@@ -1,5 +1,8 @@
 # Changelog
 
+## 53
+- Workflow template trimmed (3194 → 3130 tokens): removed repeated phrases, no rule changed.
+
 ## 52
 - workflow template: dropped delivery details agents don't act on (archive tag, closed status, journal fold contents) and a duplicate registry line
 
