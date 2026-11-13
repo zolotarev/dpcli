@@ -1,6 +1,6 @@
 # Working with agents — {{project}}
 
-Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands, never retell the journal (report, review, status); details live in the journal.
+Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands, never retell the journal (report, review, status).
 
 **Language.** Everything written for people — replies to the user, reports, journal entries, plans, docs — in {{language_text}}. Commit messages in {{language_commits}}.
 
@@ -13,7 +13,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 
 ## Lifecycle
 1. Plan `{{plan_dir}}/<m>.md`: goal, user decisions, tasks with scope and acceptance, waves, stop conditions.
-2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor. Several modules of one feature — each its own branch from the same feature branch.
+2. Branch `{{module_branch}}` **from the module base** — the feature branch the main session is on (`module new` takes the current branch; another — `--from`); copy, coordinator; contracts before the first executor.
 3. Waves: ≤ 4 executors at once; task → card → copy and branch `<m>/<ID>` from `{{module_branch}}` → acceptance (see "Acceptance").
 4. Gate (stop condition or a fork outside the plan): `{{cli}} decide <m> "question" --ask` → main session asks the user → `answer`.
 5. User check → on approval `{{cli}} deliver <m>`: one squash commit into the module base (`--into` — another branch); of the journal only `decisions.md` and `summary.md` go there; the full journal stays in `{{module_branch}}`. Don't develop the module branch after delivery. Feature branch into `{{main_branch}}` — only by the user's decision (usually an MR merged by a human); `deliver`/`merge` into `{{main_branch}}` — only with explicit `--into`.
@@ -77,7 +77,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Don't change `.claude/` or CLAUDE.md unless that is the task.
 
 ## Journal
-- `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only via commands, never edit by hand. Commit it in the module branch freely; `deliver` folds it into `decisions.md` and `summary.md`. Full view for the coordinator — `{{cli}} render <m>`.
+- `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only, only via commands. Commit it in the module branch; `deliver` folds it into `decisions.md` and `summary.md`. Full view for the coordinator — `{{cli}} render <m>`.
 - Task ID `<CODE>-<n>[letter]`; `task new <m>` without an ID takes the next number.
 - Executor: `{{cli}} task show <ID>` → work → `{{cli}} accept <ID> --dry` → `{{cli}} report <ID>` (per-task file; schema `report --template`; `uncertain` — doubts and what was checked; `dp_feedback`). `report` is the only write into the module copy.
 - Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`.
@@ -113,13 +113,12 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 - Stall: "⚠quiet" > 30–40 min — find out what it is doing, report.
 
 ## Sessions and context
-Every turn pays for the whole session context again.
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
-- With a long context the main session does not read or edit code itself: a task for an executor or a fresh session. Subagents — only when needed.
+- With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
 
 ## Self-improvement
 The process (agents, templates, rules, permissions, dpcli) improves as you work, on its own.
 - **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`.
 - **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 changes applied, then told to the user.
-- **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — edits in `.dpcli` leave only via `{{cli}} contribute F-n` (branch, commit, a PR to the dpcli hub or a +1 on a similar one; no fix = refusal, `--issue` reports on purpose); everyone gets it with the next update.
+- **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — edits in `.dpcli` leave only via `{{cli}} contribute F-n` (branch, commit, a PR to the dpcli hub or a +1 on a similar one; no fix = refusal, `--issue` reports on purpose).
 - The user's remarks about the work — into memory (feedback) at once, without waiting for a review.
