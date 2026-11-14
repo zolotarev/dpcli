@@ -1,5 +1,8 @@
 # Changelog
 
+## 54
+- Trimmed the workflow template by ~39 tokens (duplicated and redundant rules removed).
+
 ## 53
 - Workflow template trimmed (3194 → 3130 tokens): removed repeated phrases, no rule changed.
 
