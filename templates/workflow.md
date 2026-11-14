@@ -1,6 +1,6 @@
 # Working with agents — {{project}}
 
-Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands, never retell the journal (report, review, status).
+Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> -h`, `.dpcli/README.md`). Agents exchange IDs and commands, never retell the journal.
 
 **Language.** Everything written for people — replies to the user, reports, journal entries, plans, docs — in {{language_text}}. Commit messages in {{language_commits}}.
 
@@ -19,7 +19,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 5. User check → on approval `{{cli}} deliver <m>`: one squash commit into the module base (`--into` — another branch); of the journal only `decisions.md` and `summary.md` go there; the full journal stays in `{{module_branch}}`. Don't develop the module branch after delivery. Feature branch into `{{main_branch}}` — only by the user's decision (usually an MR merged by a human); `deliver`/`merge` into `{{main_branch}}` — only with explicit `--into`.
 
 ## Message protocol
-Agents send only these formats.
+Agents send only these formats:
 
 | From → to | Message |
 |---|---|
@@ -31,9 +31,8 @@ Agents send only these formats.
 | coordinator → main | `<m>: <n> accepted, <n> in progress; gate Q<n>`, `<m>: wave <n> done` (main starts a fresh coordinator for the next wave) or `<m> done` |
 | main → user | free form, from `{{cli}} status` / `{{cli}} digest` |
 
-- User decisions are already in the inbox (via `decide`); don't retell them in messages.
 - Add nothing to `brief`: task specifics go into the card (`{{cli}} task note <ID> "…"`).
-- Missing information — ask in one line. New rules for a running agent — by message, no restart.
+- Missing information — ask in one line. New rules for a running agent — by message.
 
 ## Task card — boundaries
 The coordinator writes it so the executor has nothing to search for:
@@ -68,11 +67,11 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Correctness over "looks nice": parameters are justified (domain, measurements, sources), numbers come from measurements, results from reports; assumptions and limits go into the report.
 - Minor visual/style details — at most 2 attempts.
 - Tools: files — Read (offset/limit), Edit, Write; not `sed -n`/`sed -i`/`cat >`/`python3 -` replacements. Bash runs programs: search — `rg`, files — `fd`, JSON — `jq`, structural search/rewrite of code — `ast-grep`; Python beyond one line — a script file (`uv run` / `python3 file.py`).
+- Read plans and contracts by section: `{{cli}} plan <m> <section>`, `--contracts <name>`.
 - Tests — non-interactive. GPU — `{{cli}} lock gpu <name> -- <cmd>`, heavy CPU — `{{cli}} lock cpu …`.
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
 - Batches of runs — one script, one background run, results as a table.
 - Don't open images unless appearance is the subject of the task; verify with numbers. Artifacts — in `artifacts_dir`, a subfolder per task.
-- Read plans and contracts by section: `{{cli}} plan <m> <section>`, `--contracts <name>`.
 - Commits — only your own files: `git add <paths> && git commit -m "…" -- <paths>`, with a `Claude-Session` line; no push. Never `git stash`: the stash is shared by all worktrees.
 - Don't change `.claude/` or CLAUDE.md unless that is the task.
 
@@ -113,7 +112,7 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 - Stall: "⚠quiet" > 30–40 min — find out what it is doing, report.
 
 ## Sessions and context
-- One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state is restored from the journal (`{{cli}} status`, `inbox`), not from session memory.
+- One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state comes from the journal (`{{cli}} status`, `inbox`).
 - With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
 
 ## Self-improvement
