@@ -6,7 +6,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 
 ## Roles
 - **User** — decisions, forks, acceptance of the result.
-- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan` (`--why` is the reason; no reason — leave it empty, `decisions.md` will say "approved by the developer"), gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
+- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan` (`--why` — the reason; empty if none), gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
 - **Module coordinator** (`dp-coordinator`) — contracts, task cards, launching executors, acceptance, gates. Does not write or review code.
 - **Executor** (`dpcli_role: executor`) — one task in its own copy and branch, within the card's bounds.
 - **Reviewer** (`dp-reviewer`) — fresh, empty context, one task; only reads and re-runs checks.
@@ -62,8 +62,8 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 5. Merge the task branch into `{{module_branch}}`, `{{cli}} accept <ID> --here --commit <h>`, `{{cli}} event <ID> merged`, remove the copy.
 
 ## General rules
-- Refer to decisions in plans, contracts and cards by `Q<n>` or date `YYYY-MM-DD`, not by time ("decision 12:35"): after delivery the journal with timestamps is not in the branch.
-- Deterministic work — `{{cli}}` commands (`search`, `plan`, `docs`, `log`, `status`, `task`, `sync/merge`); don't write your own grep/scripts over the journal, plans and docs. A command is missing — work around once and log feedback.
+- Refer to decisions by `Q<n>` or date `YYYY-MM-DD`, not by time: after delivery the timestamped journal is not in the branch.
+- Deterministic work — `{{cli}}` commands (`search`, `plan`, `docs`, `log`, `status`, `task`, `sync/merge`); no own grep/scripts over the journal, plans, docs. A command is missing — work around once and log feedback.
 - Correctness over "looks nice": parameters are justified (domain, measurements, sources), numbers come from measurements, results from reports; assumptions and limits go into the report.
 - Minor visual/style details — at most 2 attempts.
 - Tools: files — Read (offset/limit), Edit, Write; not `sed -n`/`sed -i`/`cat >`/`python3 -` replacements. Bash runs programs: search — `rg`, files — `fd`, JSON — `jq`, structural search/rewrite of code — `ast-grep`; Python beyond one line — a script file (`uv run` / `python3 file.py`).
@@ -76,7 +76,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Don't change `.claude/` or CLAUDE.md unless that is the task.
 
 ## Journal
-- `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only, only via commands. Commit it in the module branch; `deliver` folds it into `decisions.md` and `summary.md`. Full view for the coordinator — `{{cli}} render <m>`.
+- `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only, only via commands. `deliver` folds it into `decisions.md` and `summary.md`. Full view for the coordinator — `{{cli}} render <m>`.
 - Task ID `<CODE>-<n>[letter]`; `task new <m>` without an ID takes the next number.
 - Executor: `{{cli}} task show <ID>` → work → `{{cli}} accept <ID> --dry` → `{{cli}} report <ID>` (per-task file; schema `report --template`; `uncertain` — doubts and what was checked; `dp_feedback`). `report` is the only write into the module copy.
 - Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`.
@@ -108,8 +108,7 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 - Attach your own agent to a role — `roles` in `dpcli.yml` (`name: {role: executor, review: true}`) or `dpcli_role` in its frontmatter; then it is valid in `task new --type`.
 
 ## Monitoring
-- The main session does not poll: it wakes on a coordinator message or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`); daily summary — `{{cli}} digest --since today`.
-- Stall: "⚠quiet" > 30–40 min — find out what it is doing, report.
+- The main session does not poll: it wakes on a coordinator message or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`); daily summary — `{{cli}} digest --since today`. "⚠quiet" > 30–40 min — find out what it is doing, report.
 
 ## Sessions and context
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state comes from the journal (`{{cli}} status`, `inbox`).
