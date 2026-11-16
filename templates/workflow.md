@@ -6,7 +6,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 
 ## Roles
 - **User** — decisions, forks, acceptance of the result.
-- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan` (`--why` — the reason; empty if none), gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
+- **Main session** — plans, questions to the user as one list; a module: `{{cli}} module new <m> --area <subproject>` + one `dp-coordinator` (area — from the `areas` config key; if the developer did not name it, ask, don't guess); a module of 2–3 tasks — no coordinator, the main session briefs executors itself. User decisions — `{{cli}} decide <m> "…" --by user --why "…" --plan`, gate answers — `{{cli}} answer <Qn> "…"`, plan edits — `{{cli}} plan edit … --commit`. Branches: `{{cli}} sync <m>` (fresh module base into the module branch), delivery — `{{cli}} deliver <m>` (only after the user approves), other branches — `{{cli}} merge <branch> --into <target>`, `{{cli}} gc`. Push and releases — only on the user's command.
 - **Module coordinator** (`dp-coordinator`) — contracts, task cards, launching executors, acceptance, gates. Does not write or review code.
 - **Executor** (`dpcli_role: executor`) — one task in its own copy and branch, within the card's bounds.
 - **Reviewer** (`dp-reviewer`) — fresh, empty context, one task; only reads and re-runs checks.
@@ -89,22 +89,13 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 - Finished work — one line in `registry/findings.md` (module section): the conclusion with numbers and a `path#section` link.
 
 ## Agents and models
-| Type | Model | For |
-|---|---|---|
-| `dp-coordinator` | sonnet | module coordinator |
-| `dp-engineer` | sonnet | code and tests |
-| `dp-researcher` | sonnet | prototypes, measurements, literature |
-| `dp-writer` | sonnet | documents |
-| `dp-mechanic` | haiku | pattern replacements, runs, conflict-free merges |
-| `dp-reviewer` | sonnet | risk-based review; hardest tasks — launch with `model: opus` |
-| `dp-status` | haiku | status summary for the main session |
+Models are in the agents' frontmatter: sonnet; `dp-mechanic` (pattern replacements, runs, conflict-free merges) and `dp-status` — haiku. Hardest reviews — `dp-reviewer` with `model: opus`.
 
 Opus only if the design cannot be moved into the plan or a contract. On failure — refine the card first, the model second.
 
 ## Agent setup
 - dpcli agents — `.dpcli/agents/*.md` (Claude Code format + `dpcli_role: coordinator|executor|reviewer|status`, `dpcli_review: true|false`); `{{cli}} init` puts them into `.claude/agents/`.
 - Project changes live in the project layer `.dpcli-local/` (see its README), never in `.dpcli/` — the distribution is replaced on update: `agents/<name>.append.md` adds to a dpcli agent, `agents/<name>.md` is an own agent, `skills/<name>/`, `workflow.md` (project rules), `claude-md.md`. Then `{{cli}} init`.
-- `init` does not touch files it did not create: same-named files in `.claude/agents/` are skipped.
 - Attach your own agent to a role — `roles` in `dpcli.yml` (`name: {role: executor, review: true}`) or `dpcli_role` in its frontmatter; then it is valid in `task new --type`.
 
 ## Monitoring
