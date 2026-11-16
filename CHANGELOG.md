@@ -1,5 +1,8 @@
 # Changelog
 
+## 56
+- Workflow template: the agents/models table collapsed into one line (−103 prompt tokens).
+
 ## 55
 - Trim wordiness in the workflow template (3091 → 3046 tokens), no rule changes.
 
