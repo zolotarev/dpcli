@@ -225,12 +225,35 @@ def squash_merged(main, merged):
     return [b for b in rest if b in out]
 
 
+def archived(main, merged):
+    """Branches kept by a deliver archive tag: the module branch at the tag, its task branches inside it. deliver
+    squashes without the journal, so squash_merged cannot see them; the tag keeps all their commits."""
+    from .deliver import archive_tag
+    out = []
+    for b in gitx.local_branches():
+        if b == main or b in merged:
+            continue
+        mod = config.module_of_branch(b) or (config.task_branch_fields(b) or {}).get("module")
+        tag = mod and archive_tag(mod)
+        tip = tag and gitx.gitr("rev-parse", "-q", "--verify", f"{tag}^{{commit}}").stdout.strip()
+        if not tip:
+            continue
+        if config.module_of_branch(b):
+            if gitx.gitr("rev-parse", b).stdout.strip() == tip:
+                out.append(b)
+        elif gitx.gitr("merge-base", "--is-ancestor", b, tip).returncode == 0:
+            out.append(b)
+    return out
+
+
 def cmd_gc(a):
     main = config.main_branch()
     main_tip = gitx.gitr("rev-parse", main).stdout.strip()
     merged = [b for b in gitx.gitr("branch", "--merged", main, "--format=%(refname:short)").stdout.split() if b != main]
     squashed = squash_merged(main, merged)
     merged += squashed
+    squashed += archived(main, merged)
+    merged = merged + [b for b in squashed if b not in merged]
     here = str(gitx.toplevel())
     wt = {b: p for p, b in gitx.worktrees()}
     n = 0
