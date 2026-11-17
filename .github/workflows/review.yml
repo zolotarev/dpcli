@@ -93,6 +93,7 @@ jobs:
           B: ${{ steps.gate.outputs.branch }}
         run: git fetch -q origin "$B" && git switch -q -C "$B" "origin/$B"
       - name: rework
+        id: ai
         if: steps.gate.outputs.branch != ''
         uses: anthropics/claude-code-action@v1
         with:
@@ -109,14 +110,22 @@ jobs:
             Title or body at fault: `gh pr edit ${{ env.PR }} --title/--body` (English, CLAUDE.md).
             Finally `gh pr comment ${{ env.PR }}` — one line per item: fixed / skipped and why (never start it with `VERDICT:`).
           claude_args: >-
-            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(python3 -m unittest:*),Bash(python3 tools/metrics.py:*),Bash(git add:*),Bash(git commit:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git merge:*),Bash(git fetch:*),Bash(ls:*),Bash(wc:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr edit:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(python3 -m unittest:*),Bash(python3 tools/metrics.py:*),Bash(git add:*),Bash(git commit:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git merge:*),Bash(git fetch:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(ls:*),Bash(wc:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr edit:*)"
       - name: bundle the new commits
         id: bundle
         if: steps.gate.outputs.branch != ''
         env:
           B: ${{ steps.gate.outputs.branch }}
+          F: ${{ steps.ai.outputs.execution_file }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$B")" ] || exit 0
+          # denied tool calls: in the log always; a rework that made no commit says so in the PR instead of going silent
+          denied=$([ -f "$F" ] && jq -r '.[] | select(.type == "result") | .permission_denials[]? | "- \(.tool_name): \(.tool_input.command // .tool_input.file_path // "")"' "$F" | sort -u)
+          [ -z "$denied" ] || printf 'denied:\n%s\n' "$denied"
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$B")" ]; then
+            [ -z "$denied" ] || gh pr comment "$PR" --body "$(printf 'Auto-rework made no commit. Denied tool calls:\n%s' "$denied")"
+            exit 0
+          fi
           git bundle create "$RUNNER_TEMP/rework.bundle" "origin/$B..HEAD" && echo changed=1 >> "$GITHUB_OUTPUT"
       - if: steps.bundle.outputs.changed
         uses: actions/upload-artifact@v4
