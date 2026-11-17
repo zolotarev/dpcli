@@ -225,12 +225,39 @@ def squash_merged(main, merged):
     return [b for b in rest if b in out]
 
 
+def archived(main, merged):
+    """Branches kept by a deliver archive tag: the module branch at the tag, its task branches inside it. deliver
+    squashes without the journal, so squash_merged cannot see them; the tag keeps all their commits.
+    Trade-off: the tag may be set for a review branch not yet in main; the commits stay reachable from the tag."""
+    from .deliver import archive_tag
+    out = {}
+    for b in gitx.local_branches():
+        if b == main or b in merged:
+            continue
+        mod = config.module_of_branch(b) or (config.task_branch_fields(b) or {}).get("module")
+        tag = mod and archive_tag(mod)
+        tip = tag and gitx.gitr("rev-parse", "-q", "--verify", f"{tag}^{{commit}}").stdout.strip()
+        if not tip:
+            continue
+        # a task branch is matched by the module in its name: after a module is re-created under the same name,
+        # an old task branch inside the old tag is still removed (its commits are in the tag)
+        if config.module_of_branch(b):
+            if gitx.gitr("rev-parse", b).stdout.strip() == tip:
+                out[b] = tag
+        elif gitx.gitr("merge-base", "--is-ancestor", b, tip).returncode == 0:
+            out[b] = tag
+    return out
+
+
 def cmd_gc(a):
     main = config.main_branch()
     main_tip = gitx.gitr("rev-parse", main).stdout.strip()
     merged = [b for b in gitx.gitr("branch", "--merged", main, "--format=%(refname:short)").stdout.split() if b != main]
     squashed = squash_merged(main, merged)
     merged += squashed
+    arch = archived(main, merged)
+    squashed += list(arch)
+    merged += list(arch)
     here = str(gitx.toplevel())
     wt = {b: p for p, b in gitx.worktrees()}
     n = 0
@@ -246,6 +273,8 @@ def cmd_gc(a):
             continue  # branch == main (just created or fast-forward merged): leave it
         path = wt.get(b)
         label = f"{b}" + (f" @ {pretty(path)}" if path else " (no copy)")
+        if b in arch:
+            label += f" (commits kept by tag {arch[b]})"
         why = gc_live_reason(b, merged, mods) or (path and gc_symlink_reason(path, wt.values()))
         if why:
             print(f"skip {label}: {why}")
@@ -303,7 +332,7 @@ def register(sp):
     q.add_argument("--trailer", action="append", help="extra line at the end of the message (repeatable)")
     q.set_defaults(func=cmd_merge)
 
-    q = sp.add_parser("gc", help="copies and branches already merged into main branch (list; --remove: delete)")
+    q = sp.add_parser("gc", help="copies and branches merged into main or archived by deliver (list; --remove: delete)")
     q.add_argument("branches", nargs="*", metavar="BRANCH|MODULE", help="only these (module -> module branch)")
     q.add_argument("--remove", action="store_true")
     q.set_defaults(func=cmd_gc)
