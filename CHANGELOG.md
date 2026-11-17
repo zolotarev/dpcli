@@ -1,5 +1,8 @@
 # Changelog
 
+## 59
+- gc: a module branch at its deliver archive tag and its task branches inside the tag count as merged (the tag keeps the commits, even when deliver went to a review branch not yet in main), so delivered modules are cleaned up.
+
 ## 58
 - Journal appends start a new line when the file does not end with one (a write torn by a full disk), so only the torn record is lost.
 
