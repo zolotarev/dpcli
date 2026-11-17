@@ -230,7 +230,7 @@ def archived(main, merged):
     squashes without the journal, so squash_merged cannot see them; the tag keeps all their commits.
     Trade-off: the tag may be set for a review branch not yet in main; the commits stay reachable from the tag."""
     from .deliver import archive_tag
-    out = []
+    out = {}
     for b in gitx.local_branches():
         if b == main or b in merged:
             continue
@@ -239,11 +239,13 @@ def archived(main, merged):
         tip = tag and gitx.gitr("rev-parse", "-q", "--verify", f"{tag}^{{commit}}").stdout.strip()
         if not tip:
             continue
+        # a task branch is matched by the module in its name: after a module is re-created under the same name,
+        # an old task branch inside the old tag is still removed (its commits are in the tag)
         if config.module_of_branch(b):
             if gitx.gitr("rev-parse", b).stdout.strip() == tip:
-                out.append(b)
+                out[b] = tag
         elif gitx.gitr("merge-base", "--is-ancestor", b, tip).returncode == 0:
-            out.append(b)
+            out[b] = tag
     return out
 
 
@@ -254,8 +256,8 @@ def cmd_gc(a):
     squashed = squash_merged(main, merged)
     merged += squashed
     arch = archived(main, merged)
-    squashed += arch
-    merged += arch
+    squashed += list(arch)
+    merged += list(arch)
     here = str(gitx.toplevel())
     wt = {b: p for p, b in gitx.worktrees()}
     n = 0
@@ -271,6 +273,8 @@ def cmd_gc(a):
             continue  # branch == main (just created or fast-forward merged): leave it
         path = wt.get(b)
         label = f"{b}" + (f" @ {pretty(path)}" if path else " (no copy)")
+        if b in arch:
+            label += f" (commits kept by tag {arch[b]})"
         why = gc_live_reason(b, merged, mods) or (path and gc_symlink_reason(path, wt.values()))
         if why:
             print(f"skip {label}: {why}")

@@ -79,9 +79,34 @@ class Gc(unittest.TestCase):
         out = p.ok("gc", "--remove")
         self.assertIn("removed feature/pay @", out)
         self.assertIn("removed pay/PY-1 @", out)
+        self.assertIn("kept by tag archive/pay", out)
         left = git("branch", "--format=%(refname:short)", cwd=r).split()
         self.assertIn("feature/ship", left)
         self.assertIn("feature/draft", left)
+
+    def _pay(self, **kw):
+        p = Project(**kw)
+        self.addCleanup(p.cleanup)
+        r = p.root
+        mod, task = p.copies / "pay", p.copies / "pay-PY-1"
+        git("worktree", "add", "-q", "-b", "feature/pay", str(mod), "main", cwd=r)
+        git("worktree", "add", "-q", "-b", "pay/PY-1", str(task), "feature/pay", cwd=r)
+        (task / "t.txt").write_text("t")
+        p.commit_all("t", cwd=task)
+        git("merge", "-q", "--no-ff", "-m", "m t", "pay/PY-1", cwd=mod)
+        git("tag", "archive/pay", "feature/pay", cwd=r)
+        return p, r, mod, task
+
+    def test_archived_task_outside_tag_kept_explicit_arg(self):
+        """A task branch with a commit outside the tag is kept; `gc pay` names the module explicitly."""
+        p, r, mod, task = self._pay()
+        (task / "x.txt").write_text("x")
+        p.commit_all("outside", cwd=task)
+        out = p.ok("gc", "--remove", "pay")
+        self.assertIn("removed feature/pay @", out)
+        left = git("branch", "--format=%(refname:short)", cwd=r).split()
+        self.assertNotIn("feature/pay", left)
+        self.assertIn("pay/PY-1", left)
 
     def test_archived_tag_disabled_or_module_moved(self):
         """deliver.archive_tag empty: nothing matched. Module branch moved past its tag: its task branch is kept too."""
