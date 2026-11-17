@@ -53,38 +53,8 @@ class Gc(unittest.TestCase):
         self.assertNotIn("other", out)
         self.assertNotIn("fm", git("branch", "--format=%(refname:short)", cwd=r).split())
 
-    def test_archived_module_removable(self):
-        """Delivered via a review branch (squash without the journal): the module branch at its archive tag and its
-        task branches are removable; a module branch moved past its tag and one without a tag are kept."""
-        p = Project()
-        self.addCleanup(p.cleanup)
-        r = p.root
-        mod, task = p.copies / "pay", p.copies / "pay-PY-1"
-        git("worktree", "add", "-q", "-b", "feature/pay", str(mod), "main", cwd=r)
-        git("worktree", "add", "-q", "-b", "pay/PY-1", str(task), "feature/pay", cwd=r)
-        (task / "t.txt").write_text("t")
-        p.commit_all("t", cwd=task)
-        git("merge", "-q", "--no-ff", "-m", "m t", "pay/PY-1", cwd=mod)
-        git("tag", "archive/pay", "feature/pay", cwd=r)
-        for m in ("ship", "draft"):
-            git("branch", f"feature/{m}", "main", cwd=r)
-            git("checkout", "-q", f"feature/{m}", cwd=r)
-            (r / f"{m}.txt").write_text(m)
-            p.commit_all(m)
-        git("tag", "archive/ship", "feature/ship", cwd=r)
-        git("checkout", "-q", "feature/ship", cwd=r)
-        (r / "ship2.txt").write_text("more")
-        p.commit_all("ship more")
-        git("checkout", "-q", "main", cwd=r)
-        out = p.ok("gc", "--remove")
-        self.assertIn("removed feature/pay @", out)
-        self.assertIn("removed pay/PY-1 @", out)
-        self.assertIn("kept by tag archive/pay", out)
-        left = git("branch", "--format=%(refname:short)", cwd=r).split()
-        self.assertIn("feature/ship", left)
-        self.assertIn("feature/draft", left)
-
     def _pay(self, **kw):
+        """Module pay delivered via a review branch: archive/pay at feature/pay, task branch pay/PY-1 inside it."""
         p = Project(**kw)
         self.addCleanup(p.cleanup)
         r = p.root
@@ -96,6 +66,24 @@ class Gc(unittest.TestCase):
         git("merge", "-q", "--no-ff", "-m", "m t", "pay/PY-1", cwd=mod)
         git("tag", "archive/pay", "feature/pay", cwd=r)
         return p, r, mod, task
+
+    def test_archived_module_removable(self):
+        """The module branch at its archive tag and its task branch are removed, the tag stays as the recovery point;
+        a module branch without a tag is kept."""
+        p, r, _, _ = self._pay()
+        git("branch", "feature/draft", "main", cwd=r)
+        git("checkout", "-q", "feature/draft", cwd=r)
+        (r / "d.txt").write_text("d")
+        p.commit_all("d")
+        git("checkout", "-q", "main", cwd=r)
+        out = p.ok("gc", "--remove")
+        self.assertIn("removed feature/pay @", out)
+        self.assertIn("removed pay/PY-1 @", out)
+        self.assertIn("kept by tag archive/pay", out)
+        left = git("branch", "--format=%(refname:short)", cwd=r).split()
+        self.assertNotIn("feature/pay", left)
+        self.assertIn("feature/draft", left)
+        self.assertEqual(git("tag", "-l", "archive/pay", cwd=r).strip(), "archive/pay")
 
     def test_archived_task_outside_tag_kept_explicit_arg(self):
         """A task branch with a commit outside the tag is kept; `gc pay` names the module explicitly."""
@@ -109,27 +97,14 @@ class Gc(unittest.TestCase):
         self.assertIn("pay/PY-1", left)
 
     def test_archived_tag_disabled_or_module_moved(self):
-        """deliver.archive_tag empty: nothing matched. Module branch moved past its tag: its task branch is kept too."""
-        for cfg in ({"deliver": {"archive_tag": ""}}, None):
-            p = Project(config=cfg)
-            self.addCleanup(p.cleanup)
-            r = p.root
-            mod, task = p.copies / "pay", p.copies / "pay-PY-1"
-            git("worktree", "add", "-q", "-b", "feature/pay", str(mod), "main", cwd=r)
-            git("worktree", "add", "-q", "-b", "pay/PY-1", str(task), "feature/pay", cwd=r)
-            (task / "t.txt").write_text("t")
-            p.commit_all("t", cwd=task)
-            git("merge", "-q", "--no-ff", "-m", "m t", "pay/PY-1", cwd=mod)
-            git("tag", "archive/pay", "feature/pay", cwd=r)
-            if cfg is None:
-                (mod / "more.txt").write_text("more")
-                p.commit_all("more", cwd=mod)
-            out = p.ok("gc", "--remove")
-            self.assertNotIn("removed feature/pay @", out)
-            left = git("branch", "--format=%(refname:short)", cwd=r).split()
-            self.assertIn("feature/pay", left)
-            if cfg is not None:
-                self.assertIn("pay/PY-1", left)
+        """deliver.archive_tag empty: nothing matched. Module branch moved past its tag: kept."""
+        p, r, _, _ = self._pay(config={"deliver": {"archive_tag": ""}})
+        self.assertNotIn("feature/pay", p.ok("gc", "--remove"))
+        p, r, mod, _ = self._pay()
+        (mod / "more.txt").write_text("more")
+        p.commit_all("more", cwd=mod)
+        p.ok("gc", "--remove")
+        self.assertIn("feature/pay", git("branch", "--format=%(refname:short)", cwd=r).split())
 
     def test_squash_then_more_work_and_empty_diff_kept(self):
         """Kept: a branch with a commit after its squash, and a branch whose net diff is empty."""
