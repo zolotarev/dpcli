@@ -67,7 +67,9 @@ def judge(exp, code, out):
         if m:
             g = m[-1].groupdict()
             tot, fail, skip = (int(g.get(k) or 0) for k in ("total", "failed", "skipped"))
-            ok &= fail == 0 and tot > 0
+            # with a passed group the total may count skipped tests: a filter matching nothing must not pass
+            ran = int(g.get("passed") or 0) + fail if "passed" in g else tot
+            ok &= fail == 0 and ran > 0
             vals.append(f"{tot - fail}/{tot}" + (f" (skipped {skip})" if skip else ""))
             if fail:
                 names = re.findall(r"^\s*FAIL (\S+)", out, re.M)
