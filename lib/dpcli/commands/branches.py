@@ -328,7 +328,7 @@ def register(sp):
     q.add_argument("--trailer", action="append", help="extra line at the end of the message (repeatable)")
     q.set_defaults(func=cmd_merge)
 
-    q = sp.add_parser("gc", help="copies and branches merged into main branch or kept by a deliver archive tag, even if deliver went to a review branch (list; --remove: delete)")
+    q = sp.add_parser("gc", help="copies and branches merged into main or archived by deliver (list; --remove: delete)")
     q.add_argument("branches", nargs="*", metavar="BRANCH|MODULE", help="only these (module -> module branch)")
     q.add_argument("--remove", action="store_true")
     q.set_defaults(func=cmd_gc)
