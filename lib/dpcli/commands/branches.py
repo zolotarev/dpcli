@@ -227,7 +227,8 @@ def squash_merged(main, merged):
 
 def archived(main, merged):
     """Branches kept by a deliver archive tag: the module branch at the tag, its task branches inside it. deliver
-    squashes without the journal, so squash_merged cannot see them; the tag keeps all their commits."""
+    squashes without the journal, so squash_merged cannot see them; the tag keeps all their commits.
+    Trade-off: the tag may be set for a review branch not yet in main; the commits stay reachable from the tag."""
     from .deliver import archive_tag
     out = []
     for b in gitx.local_branches():
@@ -252,8 +253,9 @@ def cmd_gc(a):
     merged = [b for b in gitx.gitr("branch", "--merged", main, "--format=%(refname:short)").stdout.split() if b != main]
     squashed = squash_merged(main, merged)
     merged += squashed
-    squashed += archived(main, merged)
-    merged = merged + [b for b in squashed if b not in merged]
+    arch = archived(main, merged)
+    squashed += arch
+    merged += arch
     here = str(gitx.toplevel())
     wt = {b: p for p, b in gitx.worktrees()}
     n = 0
@@ -326,7 +328,7 @@ def register(sp):
     q.add_argument("--trailer", action="append", help="extra line at the end of the message (repeatable)")
     q.set_defaults(func=cmd_merge)
 
-    q = sp.add_parser("gc", help="copies and branches already merged into main branch (list; --remove: delete)")
+    q = sp.add_parser("gc", help="copies and branches merged into main branch or kept by a deliver archive tag, even if deliver went to a review branch (list; --remove: delete)")
     q.add_argument("branches", nargs="*", metavar="BRANCH|MODULE", help="only these (module -> module branch)")
     q.add_argument("--remove", action="store_true")
     q.set_defaults(func=cmd_gc)

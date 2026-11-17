@@ -83,6 +83,29 @@ class Gc(unittest.TestCase):
         self.assertIn("feature/ship", left)
         self.assertIn("feature/draft", left)
 
+    def test_archived_tag_disabled_or_module_moved(self):
+        """deliver.archive_tag empty: nothing matched. Module branch moved past its tag: its task branch is kept too."""
+        for cfg in ({"deliver": {"archive_tag": ""}}, None):
+            p = Project(config=cfg)
+            self.addCleanup(p.cleanup)
+            r = p.root
+            mod, task = p.copies / "pay", p.copies / "pay-PY-1"
+            git("worktree", "add", "-q", "-b", "feature/pay", str(mod), "main", cwd=r)
+            git("worktree", "add", "-q", "-b", "pay/PY-1", str(task), "feature/pay", cwd=r)
+            (task / "t.txt").write_text("t")
+            p.commit_all("t", cwd=task)
+            git("merge", "-q", "--no-ff", "-m", "m t", "pay/PY-1", cwd=mod)
+            git("tag", "archive/pay", "feature/pay", cwd=r)
+            if cfg is None:
+                (mod / "more.txt").write_text("more")
+                p.commit_all("more", cwd=mod)
+            out = p.ok("gc", "--remove")
+            self.assertNotIn("removed feature/pay @", out)
+            left = git("branch", "--format=%(refname:short)", cwd=r).split()
+            self.assertIn("feature/pay", left)
+            if cfg is not None:
+                self.assertIn("pay/PY-1", left)
+
     def test_squash_then_more_work_and_empty_diff_kept(self):
         """Kept: a branch with a commit after its squash, and a branch whose net diff is empty."""
         p = Project()
