@@ -1,5 +1,8 @@
 # Changelog
 
+## 57
+- accept: a tests check with a `passed` group in `checks.tests_summary` counts only tests that ran (passed + failed), so a filter that matches no test fails instead of passing.
+
 ## 56
 - Workflow template: the agents/models table collapsed into one line (−103 prompt tokens).
 
