@@ -55,8 +55,12 @@ def append_jsonl(p, obj):
     p = Path(p)
     p.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(obj, ensure_ascii=False) + "\n"
-    fd = os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    fd = os.open(p, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o644)
     try:
+        # a torn write (disk full) left no "\n": start a new line so only the torn record is lost
+        end = os.lseek(fd, 0, os.SEEK_END)
+        if end and os.pread(fd, 1, end - 1) != b"\n":
+            line = "\n" + line
         os.write(fd, line.encode())
     finally:
         os.close(fd)

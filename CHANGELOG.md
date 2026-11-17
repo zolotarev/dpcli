@@ -1,5 +1,8 @@
 # Changelog
 
+## 58
+- Journal appends start a new line when the file does not end with one (a write torn by a full disk), so only the torn record is lost.
+
 ## 57
 - accept: a tests check with a `passed` group in `checks.tests_summary` counts only tests that ran (passed + failed), so a filter that matches no test fails instead of passing.
 
