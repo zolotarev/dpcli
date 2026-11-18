@@ -1,5 +1,8 @@
 # Changelog
 
+## 60
+- Workflow template trimmed by ~100 tokens (merged repeated rules, shorter wording); no behaviour change.
+
 ## 59
 - gc: a module branch at its deliver archive tag and its task branches inside the tag count as merged (the tag keeps the commits, even when deliver went to a review branch not yet in main), so delivered modules are cleaned up.
 
