@@ -19,7 +19,7 @@ Journal, cards, branches, docs — only via `{{cli}}` (help: `{{cli}} <command> 
 5. User check → on approval `{{cli}} deliver <m>`: one squash commit into the module base (`--into` — another branch); of the journal only `decisions.md` and `summary.md` go there; the full journal stays in `{{module_branch}}`. Don't develop the module branch after delivery. Feature branch into `{{main_branch}}` — only by the user's decision (usually an MR merged by a human); `deliver`/`merge` into `{{main_branch}}` — only with explicit `--into`.
 
 ## Message protocol
-Agents send only these formats:
+Only these formats:
 
 | From → to | Message |
 |---|---|
@@ -31,8 +31,7 @@ Agents send only these formats:
 | coordinator → main | `<m>: <n> accepted, <n> in progress; gate Q<n>`, `<m>: wave <n> done` (main starts a fresh coordinator for the next wave) or `<m> done` |
 | main → user | free form, from `{{cli}} status` / `{{cli}} digest` |
 
-- Add nothing to `brief`: task specifics go into the card (`{{cli}} task note <ID> "…"`).
-- Missing information — ask in one line. New rules for a running agent — by message.
+- Add nothing to `brief`: specifics go into the card (`{{cli}} task note <ID> "…"`). Missing information — ask in one line.
 
 ## Task card — boundaries
 The coordinator writes it so the executor has nothing to search for:
@@ -46,10 +45,9 @@ The coordinator writes it so the executor has nothing to search for:
 
 ## Contracts
 `{{contracts_dir}}/<m>.md` — per interface: owner and consumers, the exact interface (signatures, fields, units, axes, types, behaviour on missing data, invariants), version.
-- Record what exists in code; report discrepancies.
+- Record what exists in code; report discrepancies. A contract test breaks if the format changed without updating the contract.
 - Only the coordinator changes an interface: version +1, notify consumers, their fix in the same step.
-- A contract test breaks if the format changed without updating the contract.
-- Bulk data between tasks — format in the contract with a version; compact, with a schema, written once (temp file + rename).
+- Bulk data between tasks — format in the contract with a version; compact, schema, written once (temp file + rename).
 
 ## Acceptance
 The coordinator does not read the task's code, diffs or logs. Allowed: `status`, `log`, `report --show`, `review --show`, the `accept` result, `git diff --stat` when merging.
@@ -64,26 +62,23 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 ## General rules
 - Refer to decisions by `Q<n>` or date `YYYY-MM-DD`, not by time: after delivery the timestamped journal is not in the branch.
 - Deterministic work — `{{cli}}` commands (`search`, `plan`, `docs`, `log`, `status`, `task`, `sync/merge`); no own grep/scripts over the journal, plans, docs. A command is missing — work around once and log feedback.
-- Correctness over "looks nice": parameters are justified (domain, measurements, sources), numbers come from measurements, results from reports; assumptions and limits go into the report.
-- Minor visual/style details — at most 2 attempts.
+- Correctness over "looks nice": parameters justified (domain, measurements, sources), numbers from measurements, results from reports; assumptions and limits go into the report.
 - Tools: files — Read (offset/limit), Edit, Write; not `sed -n`/`sed -i`/`cat >`/`python3 -` replacements. Bash runs programs: search — `rg`, files — `fd`, JSON — `jq`, structural search/rewrite of code — `ast-grep`; Python beyond one line — a script file (`uv run` / `python3 file.py`).
-- Read plans and contracts by section: `{{cli}} plan <m> <section>`, `--contracts <name>`.
 - Tests — non-interactive. GPU — `{{cli}} lock gpu <name> -- <cmd>`, heavy CPU — `{{cli}} lock cpu …`.
 - Long runs (> 1–2 min) — `run_in_background` or `{{cli}} job start <name> <timeout> <cmd>` → `{{cli}} job wait <name>`. No `pgrep -f`/`pkill -f`; other processes — only by PID after `readlink /proc/PID/cwd`.
-- Batches of runs — one script, one background run, results as a table.
-- Don't open images unless appearance is the subject of the task; verify with numbers. Artifacts — in `artifacts_dir`, a subfolder per task.
+- Don't open images unless appearance is the task; verify with numbers. Artifacts — in `artifacts_dir`, a subfolder per task.
 - Commits — only your own files: `git add <paths> && git commit -m "…" -- <paths>`, with a `Claude-Session` line; no push. Never `git stash`: the stash is shared by all worktrees.
 - Don't change `.claude/` or CLAUDE.md unless that is the task.
 
 ## Journal
 - `{{plan_dir}}/<m>/` — cards, reports, `events.jsonl`, `decisions.jsonl`; append-only, only via commands. `deliver` folds it into `decisions.md` and `summary.md`. Full view for the coordinator — `{{cli}} render <m>`.
-- Task ID `<CODE>-<n>[letter]`; `task new <m>` without an ID takes the next number.
+- Task ID `<CODE>-<n>[letter]`; `task new <m>` without ID takes the next.
 - Executor: `{{cli}} task show <ID>` → work → `{{cli}} accept <ID> --dry` → `{{cli}} report <ID>` (per-task file; schema `report --template`; `uncertain` — doubts and what was checked; `dp_feedback`). `report` is the only write into the module copy.
 - Coordinator: `{{cli}} inbox <m>` at the start of every step; journal commit — `git add {{plan_dir}}/<m> && git commit -m "…" -- {{plan_dir}}/<m>`.
 
 ## Documentation
 - Entry — `{{docs_dir}}/INDEX.md`. Find — `{{cli}} docs find <words>`, `{{cli}} docs findings <words>`, module journals — `{{cli}} search <text>` (`--sem` — by meaning, if enabled).
-- Read by section, not whole: `{{cli}} docs section <path>` — table of contents, `{{cli}} docs section <path> <number|heading start>` — a section.
+- Read by section, not whole (plans — `{{cli}} plan <m> <section>`, `--contracts <name>`): `{{cli}} docs section <path>` — table of contents, `{{cli}} docs section <path> <number|heading start>` — a section.
 - Every md has frontmatter (`type`, `status`, `module`, `updated`, `summary`, `related`); new — `{{cli}} docs init`; `summary` — the conclusion/purpose in one line ≤ 140 chars (not TODO).
 - Document size ≤ `docs.max_kb`: larger — split into section files or move data out; before commit — `{{cli}} docs check`, registries — `{{cli}} docs index`.
 - Finished work — one line in `registry/findings.md` (module section): the conclusion with numbers and a `path#section` link.
@@ -91,7 +86,7 @@ The coordinator does not read the task's code, diffs or logs. Allowed: `status`,
 ## Agents and models
 Models are in the agents' frontmatter: sonnet; `dp-mechanic` (pattern replacements, runs, conflict-free merges) and `dp-status` — haiku. Hardest reviews — `dp-reviewer` with `model: opus`.
 
-Opus only if the design cannot be moved into the plan or a contract. On failure — refine the card first, the model second.
+Opus only if the design cannot be moved into the plan or a contract; on failure refine the card first.
 
 ## Agent setup
 - dpcli agents — `.dpcli/agents/*.md` (Claude Code format + `dpcli_role: coordinator|executor|reviewer|status`, `dpcli_review: true|false`); `{{cli}} init` puts them into `.claude/agents/`.
@@ -99,15 +94,15 @@ Opus only if the design cannot be moved into the plan or a contract. On failure 
 - Attach your own agent to a role — `roles` in `dpcli.yml` (`name: {role: executor, review: true}`) or `dpcli_role` in its frontmatter; then it is valid in `task new --type`.
 
 ## Monitoring
-- The main session does not poll: it wakes on a coordinator message or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`); daily summary — `{{cli}} digest --since today`. "⚠quiet" > 30–40 min — find out what it is doing, report.
+- The main session does not poll: it wakes on a coordinator message or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`), daily — `{{cli}} digest --since today`. "⚠quiet" > 30–40 min — find out why, report.
 
 ## Sessions and context
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state comes from the journal (`{{cli}} status`, `inbox`).
-- With a long context the main session does not read or edit code itself: a task for an executor or a fresh session.
+- With a long context the main session does not touch code: executor or fresh session.
 
 ## Self-improvement
-The process (agents, templates, rules, permissions, dpcli) improves as you work, on its own.
-- **Collect — everyone, as you go, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`.
-- **Review — main session, skill `harness-retro`:** on `<m> done`, once per phase or on the user's request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 changes applied, then told to the user.
+The process (agents, templates, rules, permissions, dpcli) improves as you work.
+- **Collect — everyone, one line.** Friction = an extra rework round, waiting for a permission, working around a dpcli command, a rule that hinders or contradicts, wasted tokens/time, a repeated mistake. Executor — the report's `dp_feedback`; reviewer — the review's `harness`; coordinator and main session — `{{cli}} event <m> note --note "harness: <what hurt> → <what to change>"`.
+- **Review — main session, skill `harness-retro`:** on `<m> done`, per phase or on request: `{{cli}} feedback` (clusters, triage project|dpcli), `{{cli}} stats`, ≤ 3 changes applied, then told to the user.
 - **Where fixes go.** Project-specific — `.dpcli-local/` (survives updates). dpcli itself — edits in `.dpcli` leave only via `{{cli}} contribute F-n` (branch, commit, a PR to the dpcli hub or a +1 on a similar one; no fix = refusal, `--issue` reports on purpose).
-- The user's remarks about the work — into memory (feedback) at once, without waiting for a review.
+- The user's remarks about the work — into memory (feedback) at once.
