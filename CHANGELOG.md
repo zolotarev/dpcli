@@ -1,5 +1,11 @@
 # Changelog
 
+## 61
+- `bash_guard` removed, and `init` drops its hook: every block cost the agent a round, Edit needs a full Read first so `sed -i` was the cheaper edit, and two narrowing fixes left 9 more reports (33 in total).
+
+## 60
+- Workflow template trimmed by ~100 tokens (merged repeated rules, shorter wording); no behaviour change.
+
 ## 59
 - gc: a module branch at its deliver archive tag and its task branches inside the tag count as merged (the tag keeps the commits, even when deliver went to a review branch not yet in main), so delivered modules are cleaned up.
 
