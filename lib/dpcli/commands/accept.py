@@ -42,6 +42,7 @@ def parse_expect(exp):
 
 
 TESTS_SUMMARY = r"(?P<total>\d+) (?:тестов|tests?), (?P<failed>\d+) (?:упало|failed)(?:, (?P<skipped>\d+) (?:пропущено|skipped))?"
+EMPTY_RUN = r"No projects matched the filters"
 
 
 def tests_summary_rx():
@@ -101,6 +102,10 @@ def judge(exp, code, out):
             if k in exp:
                 ok &= f(v, float(exp[k]))
         vals.append(f"{v:g}")
+    # a filter that matches no package exits 0 having done nothing: `pnpm --filter <typo> build` must not pass
+    m = re.search(config.get("checks.empty_run") or EMPTY_RUN, out, re.M)
+    if m:
+        ok, vals = False, vals + ["ran nothing: " + short(m[0], 40)]
     return bool(ok), "; ".join(vals) or f"exit {code}"
 
 
