@@ -68,6 +68,8 @@ checks:
   # optionally (?P<skipped>…); the last match is used. No match — judged by exit code.
   # Default — "N tests, M failed[, K skipped]" (the Russian "N тестов, M упало" form is accepted too). Use single quotes for the regex (no \\ escaping).
   # tests_summary: '(?P<total>\d+) tests, (?P<failed>\d+) failed'
+  # Output that means a check ran nothing (fails it whatever the exit code); default — pnpm's "No projects matched the filters". '' disables; not applied when expect has re/not_re/num.
+  # empty_run: 'No projects matched the filters'
   # Where check logs are written: <log_dir>/<ID>/.
   log_dir: build/dpcli
   # accept goes to the background when its checks took longer than this last time, s (0 — never).
