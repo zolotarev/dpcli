@@ -103,9 +103,16 @@ def judge(exp, code, out):
                 ok &= f(v, float(exp[k]))
         vals.append(f"{v:g}")
     # a filter that matches no package exits 0 having done nothing: `pnpm --filter <typo> build` must not pass
-    m = re.search(config.get("checks.empty_run") or EMPTY_RUN, out, re.M)
-    if m:
-        ok, vals = False, vals + ["ran nothing: " + short(m[0], 40)]
+    # skipped when the expectation already tests the output; checks.empty_run: '' disables it
+    src = config.get("checks.empty_run")
+    src = EMPTY_RUN if src is None else str(src)
+    if src and not any(exp.get(k) for k in ("re", "not_re", "num")):
+        try:
+            m = re.search(src, out, re.M)
+        except re.error as e:
+            raise DpError(f"checks.empty_run «{src}»: invalid regex ({e})")
+        if m:
+            ok, vals = False, vals + ["ran nothing: " + short(m[0], 40)]
     return bool(ok), "; ".join(vals) or f"exit {code}"
 
 

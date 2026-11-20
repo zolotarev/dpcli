@@ -27,6 +27,18 @@ class JudgeEmptyRun(unittest.TestCase):
         self.assertFalse(judge("collected 0 items\n", {"checks.empty_run": r"collected 0 items"})[0])
         self.assertTrue(judge("No projects matched the filters\n", {"checks.empty_run": r"collected 0 items"})[0])
 
+    def test_invalid_regex_is_dp_error(self):
+        with self.assertRaises(accept.DpError):
+            judge("x\n", {"checks.empty_run": "("})
+
+    def test_empty_string_disables(self):
+        self.assertTrue(judge("No projects matched the filters\n", {"checks.empty_run": ""})[0])
+
+    def test_skipped_when_expect_tests_output(self):
+        with mock.patch.object(accept.config, "get", lambda k, d=None: None):
+            ok, _ = accept.judge({"re": "No projects matched"}, 0, "No projects matched the filters\n")
+        self.assertTrue(ok)
+
 
 if __name__ == "__main__":
     unittest.main()
