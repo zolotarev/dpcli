@@ -1,5 +1,8 @@
 # Changelog
 
+## 62
+- accept: a check whose output says it ran nothing fails whatever its exit code — by default pnpm's "No projects matched the filters", so `pnpm --filter <wrong name> build` no longer passes; `checks.empty_run` overrides the pattern.
+
 ## 61
 - `bash_guard` removed, and `init` drops its hook: every block cost the agent a round, Edit needs a full Read first so `sed -i` was the cheaper edit, and two narrowing fixes left 9 more reports (33 in total).
 
