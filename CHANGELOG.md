@@ -1,5 +1,8 @@
 # Changelog
 
+## 65
+- Workflow template, "Monitoring": executor notices (`<ID> reported`) reaching the main session go to the running coordinator via `SendMessage`, not a new one.
+
 ## 64
 - plan: a section query that matches no heading but names a whole word in the file (a contract ID in the body or front matter) prints the innermost section containing it, so `plan <m> --contracts C-x-y` from a card works.
 

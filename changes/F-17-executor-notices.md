@@ -1,1 +1,0 @@
-- Workflow template, "Monitoring": executor notices (`<ID> reported`) reaching the main session go to the running coordinator via `SendMessage`, not a new one.
