@@ -1,5 +1,8 @@
 # Changelog
 
+## 63
+- accept: `--here` for a task with its own copy refuses when the current copy is on neither the module branch nor the task branch — re-checking a merged task from a copy on `main` ran the checks on `main` and could pass falsely; the error suggests `--cwd`.
+
 ## 62
 - accept: a check whose output says it ran nothing fails whatever its exit code — by default pnpm's "No projects matched the filters", so `pnpm --filter <wrong name> build` no longer passes; `checks.empty_run` overrides the pattern.
 

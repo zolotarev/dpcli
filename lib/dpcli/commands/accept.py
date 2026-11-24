@@ -320,6 +320,11 @@ def cmd_accept(a):
     if not cwd:
         cp = Path(os.path.expanduser(card.get("copy", ""))) if card.get("copy") else None
         cwd = str(cp) if cp and cp.is_dir() and not a.here else str(gitx.toplevel())
+        base = card.get("base") or config.module_branch(mod)
+        cur = gitx.git("branch", "--show-current", cwd=cwd)
+        if a.here and cp and cp.is_dir() and cur not in (base, card.get("branch")):  # a merged task re-checked on main: false PASS
+            raise DpError(f"{a.id}: --here runs the checks on {cur or 'a detached HEAD'}, not on {base}; "
+                          f"{CLI} accept {a.id} --cwd <copy on {base}>")
     logdir = config.repo_path(config.get("checks.log_dir", "build/dpcli")) / a.id
     logdir.mkdir(parents=True, exist_ok=True)
     if a.bg:
