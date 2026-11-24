@@ -33,6 +33,12 @@ class BranchesByJournal(unittest.TestCase):
         self.assertIn("background", out)
         self.p.ok("job", "wait", "dp-accept-AA-1", "60", cwd=self.mc)
 
+    def test_accept_here_off_the_module_branch_refused(self):
+        git("switch", "-q", "-c", "other", cwd=self.mc)  # e.g. the main copy on main after the task was merged
+        code, _, err = self.p.run("accept", "AA-1", "--here", "--dry", cwd=self.mc)
+        self.assertEqual(code, 1, err)
+        self.assertIn("not on feature/aa", err)
+
 
 if __name__ == "__main__":
     unittest.main()
