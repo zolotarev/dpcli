@@ -110,6 +110,11 @@ class LocalLayer(unittest.TestCase):
         cm = self.read("CLAUDE.md")
         self.assertIn("Ask before touching billing.", cm.split("<!-- dpcli:end -->")[0])
 
+    def test_workflow_forwards_executor_notices(self):
+        wf = self.read(".claude/dpcli-workflow.md")
+        self.assertIn("`SendMessage`", wf)
+        self.assertIn("<ID> reported", wf)
+
     def test_survives_distribution_update_and_is_idempotent(self):
         # simulate an update of the distribution: agent text changes upstream
         f = self.p.root / ".dpcli" / "agents" / "dp-engineer.md"

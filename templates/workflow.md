@@ -95,6 +95,7 @@ Opus only if the design cannot be moved into the plan or a contract; on failure 
 
 ## Monitoring
 - The main session does not poll: it wakes on a coordinator message or the user's request — then `{{cli}} status --since <period>` (stalls — `dp-status`), daily — `{{cli}} digest --since today`. "⚠quiet" > 30–40 min — find out why, report.
+- Executor notices (`<ID> reported`) land in the main session: pass them to the running coordinator with `SendMessage`, do not start a new one.
 
 ## Sessions and context
 - One session — one phase or module. After a merge, module acceptance or a change of topic — `/clear` or a new session; state comes from the journal (`{{cli}} status`, `inbox`).
