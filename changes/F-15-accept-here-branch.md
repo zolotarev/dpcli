@@ -1,1 +1,0 @@
-- accept: `--here` for a task with its own copy refuses when the current copy is on neither the module branch nor the task branch — re-checking a merged task from a copy on `main` ran the checks on `main` and could pass falsely; the error suggests `--cwd`.
