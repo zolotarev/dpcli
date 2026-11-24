@@ -1,1 +1,1 @@
-- Workflow template, "Monitoring": executor notices reach the main session — it forwards `<ID> reported` and wakes the coordinator instead of starting a new one, and does not run what permissions refused an executor; the project-layer line points to its README instead of repeating the layout (prompt size unchanged).
+- Workflow template, "Monitoring": executor notices (`<ID> reported`) reaching the main session go to the running coordinator via `SendMessage`, not a new one.
