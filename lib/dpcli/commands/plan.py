@@ -1,4 +1,5 @@
 """plan (table of contents/section), plan edit, render (module md journal)."""
+import re
 import sys
 from pathlib import Path
 
@@ -44,6 +45,10 @@ def cmd_plan(a):
             print(t)
         return
     sel = find_section(heads, a.section)
+    word = re.compile(rf"(?<![\w-]){re.escape(a.section.strip())}(?![\w-])")
+    hit = next((i for i, ln in enumerate(lines) if word.search(ln)), None) if sel is None and heads else None
+    if hit is not None:  # a contract named in the text or front matter, not in a heading: its innermost section
+        sel = max([n for n, (j, _, _) in enumerate(heads) if j <= hit] or [0])
     if sel is None:
         other = path.parent / f"{a.section.strip()}.md"  # cards name another contracts file as if it were a section
         raise DpError(f"section \"{a.section.strip()}\" not found; table of contents: {CLI} plan {a.target}"
