@@ -1,5 +1,8 @@
 # Changelog
 
+## 64
+- plan: a section query that matches no heading but names a whole word in the file (a contract ID in the body or front matter) prints the innermost section containing it, so `plan <m> --contracts C-x-y` from a card works.
+
 ## 63
 - accept: `--here` for a task with its own copy refuses when the current copy is on neither the module branch nor the task branch — re-checking a merged task from a copy on `main` ran the checks on `main` and could pass falsely; the error suggests `--cwd`.
 
