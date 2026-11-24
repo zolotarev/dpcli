@@ -61,6 +61,26 @@ class PlanSections(unittest.TestCase):
         self.assertIn("plan pf --contracts", err)  # the table of contents of the same file
         self.assertIn("docs/contracts/cli.md", err)
 
+    def test_contract_named_only_in_text_found(self):
+        d = self.p.root / "docs" / "contracts"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "pf.md").write_text("---\nsummary: C-pf-api v1\n---\n# Contracts\n## 1. Auth\nC-pf-auth v2: x\n## 2. Other\n",
+                                 encoding="utf-8")
+        out = self.p.ok("plan", "pf", "C-pf-auth", "--contracts")
+        self.assertIn("C-pf-auth v2", out)
+        self.assertNotIn("2. Other", out)
+        self.assertIn("2. Other", self.p.ok("plan", "pf", "C-pf-api", "--contracts"))  # front matter: the whole file
+        self.assertEqual(self.p.run("plan", "pf", "C-pf", "--contracts")[0], 1)  # a whole name, not a prefix
+
+    def test_contract_in_front_matter_before_level2_heading(self):
+        d = self.p.root / "docs" / "contracts"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "pf.md").write_text("---\nsummary: C-pf-api v1\n---\n## 1. Auth\nbody\n## 2. Other\nprose Nowhere here\n",
+                                 encoding="utf-8")
+        out = self.p.ok("plan", "pf", "C-pf-api", "--contracts")
+        self.assertIn("2. Other", out)
+        self.assertEqual(self.p.run("plan", "pf", "Nowhere", "--contracts")[0], 1)  # a plain word in prose still errors
+
     def test_plan_ref_checked_at_task_new(self):
         args = ["task", "new", "pf", "--type", "dp-engineer", "--title", "t", "--goal", "g", "--scope", "src", "--no-copy"]
         for bad in ("7. Nowhere", "7. Nowhere (x)", "Goal (1)"):
