@@ -1,5 +1,8 @@
 # Changelog
 
+## 66
+- accept: a check name longer than 120 bytes (a tests filter with several paths) is cut and suffixed with its hash in the log file name; it used to crash with OSError "File name too long".
+
 ## 65
 - Workflow template, "Monitoring": executor notices (`<ID> reported`) reaching the main session go to the running coordinator via `SendMessage`, not a new one.
 
