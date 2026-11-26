@@ -1,0 +1,1 @@
+- accept: a check name longer than 120 bytes (a tests filter with several paths) is cut and suffixed with its hash in the log file name; it used to crash with OSError "File name too long".

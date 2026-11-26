@@ -31,6 +31,12 @@ class AcceptWithoutWaits(unittest.TestCase):
         self.assertIn("PASS slow", self.p.ok("job", "wait", "dp-accept-AA-1", "60"))
         self.assertIn("PASS slow", self.p.ok("accept", "AA-1", "--dry", "--fg"))
 
+    def test_long_check_name_fits_log_file_name(self):
+        # a tests filter with several long paths became the log name verbatim: OSError File name too long
+        name = "tests " + " ".join(f"plane/tests/contract/app/test_very_long_module_name_{i}_app.py" for i in range(6))
+        self.p.ok("task", "set", "AA-1", "--check", name, "true", "exit=0")
+        self.assertIn("PASS", self.p.ok("accept", "AA-1", "--dry", "--fg", "--only", name))
+
     def test_check_does_not_read_agent_stdin(self):
         # a formatter run without files waited on stdin the agent keeps open, until the check timeout
         self.p.ok("task", "set", "AA-1", "--check", "slow", "cat", "exit=0", "--check-timeout", "slow", "5")

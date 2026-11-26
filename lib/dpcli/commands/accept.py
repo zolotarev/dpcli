@@ -1,6 +1,7 @@
 """accept: run the card checks (optionally in the background via job)."""
 import concurrent.futures as cf
 import fnmatch
+import hashlib
 import os
 import re
 import subprocess
@@ -144,6 +145,8 @@ def run_check(c, cwd, logdir, idx, tid):
         wd = Path(cwd) / wd
     env = check_env(tid)
     safe = re.sub(r"[^\w.-]+", "_", name)
+    if len(safe.encode()) > 120:  # NAME_MAX is 255 bytes; a filter with several paths overflows it
+        safe = safe.encode()[:100].decode(errors="ignore") + "-" + hashlib.sha1(name.encode()).hexdigest()[:10]
     log = logdir / f"{safe}.log"  # by name: --only or a re-created check must not leave stale logs under other numbers
     t0 = time.time()
     try:
